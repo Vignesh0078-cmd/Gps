@@ -453,6 +453,7 @@ class SyncEngine {
       let query = this.db
         .from('trips')
         .select('*')
+        .eq('status', 'completed')
         .order('started_at', { ascending: false })
         .limit(60);
 
@@ -463,7 +464,13 @@ class SyncEngine {
       const { data, error } = await query;
       if (error) throw new Error(error.message);
 
-      const validRows = (data || []).filter(row => row.distance_km !== null || row.status === 'completed');
+      const validRows = (data || []).filter(row => {
+        if (row.status !== 'completed') return false;
+        if (row.distance_km === null || row.distance_km === undefined) return false;
+        if (row.calculation_method === 'Model A (Known Corridor)') return false;
+        if (row.start_location && row.start_location.includes('Chennai Port Container Terminal')) return false;
+        return true;
+      });
       return validRows.map(row => this.normalizeTripRecord(row));
     } catch (err) {
       console.warn('[SyncEngine] Fetch trips failed:', err.message);

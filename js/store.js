@@ -7,7 +7,7 @@
  * - Driver Locations & Offline Queue
  */
 
-const STORAGE_KEY = 'NAMMA_LORRY_GPS_STORE_V5';
+const STORAGE_KEY = 'NAMMA_LORRY_GPS_STORE_V6';
 
 // Pure real data initial template (Zero fake trips, zero fake km)
 const SEED_DATA = {
@@ -103,9 +103,16 @@ class Store {
       localStorage.removeItem('NAMMA_LORRY_GPS_STORE_V2');
       localStorage.removeItem('NAMMA_LORRY_GPS_STORE_V3');
       localStorage.removeItem('NAMMA_LORRY_GPS_STORE_V4');
+      localStorage.removeItem('NAMMA_LORRY_GPS_STORE_V5');
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed.trips) {
+          parsed.trips = parsed.trips.filter(t => 
+            t.calculationMethod !== 'Model A (Known Corridor)' &&
+            !(t.origin && t.origin.includes('Chennai Port Container Terminal'))
+          );
+        }
         return { ...SEED_DATA, ...parsed };
       }
     } catch (e) {
@@ -210,8 +217,19 @@ class Store {
 
   setTrips(trips) {
     if (!Array.isArray(trips)) return;
+    // Strict filter: real trips only, no mock corridors or simulation templates
+    const realTrips = trips.filter(t => {
+      const method = t.calculationMethod || t.calculation_method || '';
+      const origin = t.origin || t.start_location || '';
+      const status = t.status || '';
+      if (status && status !== 'completed') return false;
+      if (method === 'Model A (Known Corridor)') return false;
+      if (origin.includes('Chennai Port Container Terminal')) return false;
+      return true;
+    });
+
     // Sort descending by startedAt
-    const sorted = [...trips].sort((a, b) => {
+    const sorted = [...realTrips].sort((a, b) => {
       const ta = new Date(a.startedAt || a.started_at || a.created_at || 0).getTime();
       const tb = new Date(b.startedAt || b.started_at || b.created_at || 0).getTime();
       return tb - ta;
@@ -259,7 +277,11 @@ class Store {
     const targetId = driverId || this.data.activeDriverId;
     const trips = (this.data.trips || []).filter(t => {
       const dId = t.driverId || t.driver_id;
-      return dId === targetId && (t.status === 'completed' || !t.status);
+      if (dId !== targetId) return false;
+      if (t.status && t.status !== 'completed') return false;
+      if (t.calculationMethod === 'Model A (Known Corridor)') return false;
+      if (t.origin && t.origin.includes('Chennai Port Container Terminal')) return false;
+      return true;
     });
     
     // Today calculation
