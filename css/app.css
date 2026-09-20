@@ -1,0 +1,984 @@
+/* Namma Lorry — Main Application Styles */
+
+/* App Wrapper */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--nl-surface);
+}
+
+/* Header */
+.app-header {
+  height: 68px;
+  background: rgba(11, 21, 35, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--nl-surface-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  height: 42px;
+  width: auto;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.brand-title-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-name span {
+  color: var(--nl-accent);
+}
+
+.brand-subtitle {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--nl-text-secondary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Nav Tabs */
+.nav-tabs {
+  display: flex;
+  background: var(--nl-surface-dim);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 4px;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--nl-text-secondary);
+  border: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nav-tab:hover {
+  color: var(--nl-text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab.active {
+  background: var(--nl-primary-container);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(253, 101, 30, 0.3);
+}
+
+/* Header Controls */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.network-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.network-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.driver-profile-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px 5px 6px;
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-pill);
+}
+
+.driver-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--nl-accent), #0f2942);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.driver-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.driver-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.driver-lorry {
+  font-size: 0.68rem;
+  color: var(--nl-text-secondary);
+}
+
+/* Views Container */
+.main-content {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-section {
+  display: none;
+  flex: 1;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.view-section.active {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ====================================================
+   VIEW 1: DRIVER MOBILE COCKPIT & LIVE MAP
+   ==================================================== */
+.cockpit-layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 20px;
+  height: calc(100vh - 110px);
+  min-height: 680px;
+}
+
+/* Left Cockpit Panel */
+.cockpit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Trip Control Card */
+.trip-control-card {
+  background: linear-gradient(180deg, #13243a 0%, #0d1a2b 100%);
+  border: 1px solid rgba(253, 101, 30, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.trip-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.route-selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.route-selector-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nl-text-secondary);
+}
+
+.select-input, .text-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--nl-surface-dim);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  font-family: var(--nl-font-sans);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.select-input:focus, .text-input:focus {
+  border-color: var(--nl-accent);
+}
+
+/* Live Telemetry HUD */
+.hud-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hud-tile {
+  background: rgba(7, 13, 23, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-tile::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--nl-accent);
+  opacity: 0.4;
+}
+
+.hud-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.hud-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  font-family: var(--nl-font-mono);
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.hud-unit {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--nl-text-secondary);
+}
+
+/* Big Action Button */
+.btn-trip-action {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: var(--radius-md);
+}
+
+/* Simulation Settings Card */
+.sim-settings-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+}
+
+.sim-speed-pills {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.speed-pill {
+  flex: 1;
+  padding: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid var(--nl-surface-card-border);
+  background: var(--nl-surface-dim);
+  color: var(--nl-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.speed-pill.active {
+  background: var(--nl-accent);
+  color: #ffffff;
+  border-color: var(--nl-accent);
+}
+
+/* Quality & Queue Status Card */
+.quality-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.telemetry-row:last-child {
+  border-bottom: none;
+}
+
+.telemetry-title {
+  font-size: 0.8rem;
+  color: var(--nl-text-secondary);
+}
+
+.telemetry-val {
+  font-family: var(--nl-font-mono);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* Map Container */
+.map-view-wrapper {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+#driverMap, #adminFleetMap {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: #0b1523;
+  z-index: 10;
+}
+
+/* Map Floating Overlays */
+.map-overlay-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 500;
+  background: rgba(11, 21, 35, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-md);
+}
+
+.map-controls-group {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 500;
+  display: flex;
+  gap: 8px;
+}
+
+.map-btn {
+  background: rgba(11, 21, 35, 0.9);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.map-btn:hover {
+  background: var(--nl-primary-container);
+  border-color: var(--nl-accent);
+}
+
+/* Map Legend */
+.map-legend {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 500;
+  background: rgba(11, 21, 35, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--nl-text-secondary);
+}
+
+.legend-line {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.legend-line.gps { background: var(--nl-success); }
+.legend-line.osrm { background: var(--nl-cyan); }
+.legend-dot.bad {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nl-error);
+}
+
+/* ====================================================
+   VIEW 2: DRIVER STATS & TRIP HISTORY
+   ==================================================== */
+.stats-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.stat-card-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--nl-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-card-value {
+  font-size: 2.2rem;
+  font-weight: 800;
+  font-family: var(--nl-font-mono);
+  color: #ffffff;
+  margin: 6px 0 4px;
+}
+
+.stat-card-sub {
+  font-size: 0.78rem;
+  color: var(--nl-text-secondary);
+}
+
+/* Weekly Chart Card */
+.chart-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.weekly-bar-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 200px;
+  padding-top: 30px;
+  gap: 16px;
+}
+
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bar-pill-track {
+  width: 100%;
+  max-width: 44px;
+  height: 140px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, var(--nl-accent), #b43d04);
+  border-radius: var(--radius-sm);
+  transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+.bar-fill.active {
+  background: linear-gradient(180deg, #00d2d3, #0984e3);
+  box-shadow: 0 0 14px rgba(0, 210, 211, 0.4);
+}
+
+.bar-val-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--nl-font-mono);
+  color: var(--nl-text-primary);
+}
+
+.bar-day-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--nl-text-muted);
+}
+
+/* Trip History Table */
+.table-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.nl-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.nl-table th {
+  padding: 12px 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-text-muted);
+  border-bottom: 1px solid var(--nl-surface-card-border);
+}
+
+.nl-table td {
+  padding: 14px 16px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--nl-text-primary);
+}
+
+.nl-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ====================================================
+   VIEW 3: ADMIN FLEET COMMAND
+   ==================================================== */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  height: calc(100vh - 110px);
+  min-height: 680px;
+}
+
+.fleet-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.vehicle-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.vehicle-card:hover {
+  border-color: var(--nl-accent);
+  background: var(--nl-surface-card-hover);
+}
+
+.vehicle-card.selected {
+  border-color: var(--nl-accent);
+  box-shadow: 0 0 14px rgba(253, 101, 30, 0.3);
+}
+
+/* ====================================================
+   VIEW 4: ALGORITHM LAB & TEST SUITE (Section 31)
+   ==================================================== */
+.test-suite-layout {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  gap: 20px;
+  height: calc(100vh - 110px);
+}
+
+.test-cases-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.test-case-item {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.test-case-item:hover {
+  background: var(--nl-surface-card-hover);
+}
+
+.test-case-item.active {
+  border-color: var(--nl-accent);
+}
+
+.test-log-console {
+  background: #060b13;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--nl-font-mono);
+  font-size: 0.8rem;
+  overflow-y: auto;
+}
+
+.log-entry {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.log-info { color: #81ecec; }
+.log-success { color: #55efc4; }
+.log-warn { color: #ffeaa7; }
+.log-error { color: #ff7675; }
+
+/* ====================================================
+   MODAL: TRIP COMPLETED & AUDIT SUMMARY
+   ==================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 9, 16, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  background: var(--nl-surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.96);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 28px;
+}
+
+.modal-backdrop.open .modal-card {
+  transform: scale(1);
+}
+
+.model-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.model-box {
+  background: var(--nl-surface-dim);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.model-box.chosen {
+  border-color: var(--nl-accent);
+  background: rgba(253, 101, 30, 0.08);
+  box-shadow: 0 0 16px rgba(253, 101, 30, 0.2);
+}
+
+.model-box.chosen::after {
+  content: 'SELECTED';
+  position: absolute;
+  top: -9px;
+  right: 12px;
+  background: var(--nl-accent);
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+}
+
+.model-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--nl-text-muted);
+  text-transform: uppercase;
+}
+
+.model-km {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-family: var(--nl-font-mono);
+  color: #ffffff;
+  margin: 6px 0;
+}
+
+.model-desc {
+  font-size: 0.7rem;
+  color: var(--nl-text-secondary);
+}
+
+/* Custom Truck Icon for Leaflet */
+.truck-marker-icon {
+  background: #001428;
+  border: 2px solid var(--nl-accent);
+  box-shadow: 0 0 16px rgba(253, 101, 30, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  transition: transform 0.3s ease;
+}
+
+/* Journey Locations Card (Pure GPS Track) */
+.journey-locations-card {
+  background: rgba(7, 13, 23, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.location-point-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.location-marker-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.location-marker-icon.start-icon {
+  background: rgba(0, 176, 116, 0.15);
+  border: 1.5px solid var(--nl-success);
+}
+
+.location-marker-icon.stop-icon {
+  background: rgba(255, 71, 87, 0.15);
+  border: 1.5px solid var(--nl-error);
+}
+
+.location-point-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.location-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.location-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-text-muted);
+}
+
+.location-status-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.location-status-badge.ready {
+  background: rgba(0, 176, 116, 0.15);
+  color: var(--nl-success);
+  border: 1px solid rgba(0, 176, 116, 0.3);
+}
+
+.location-status-badge.locked {
+  background: rgba(0, 210, 211, 0.15);
+  color: var(--nl-cyan);
+  border: 1px solid rgba(0, 210, 211, 0.3);
+}
+
+.location-status-badge.pending {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nl-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.location-status-badge.stopped {
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--nl-error);
+  border: 1px solid rgba(255, 71, 87, 0.3);
+}
+
+.location-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.location-coords {
+  font-family: var(--nl-font-mono);
+  font-size: 0.72rem;
+  color: var(--nl-text-secondary);
+  margin-top: 1px;
+}
+
+.journey-connector-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  padding: 4px 0;
+  gap: 3px;
+}
+
+.connector-dot {
+  width: 3px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+}
+
+.connector-dash {
+  width: 2px;
+  height: 14px;
+  background: linear-gradient(180deg, var(--nl-success) 0%, var(--nl-error) 100%);
+  opacity: 0.5;
+  border-radius: 1px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .cockpit-layout, .admin-grid, .test-suite-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .stats-overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

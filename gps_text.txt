@@ -1,0 +1,1345 @@
+கண்டிப்பாக. நம்ம Namma Lorry – Driver Distance & GPS Tracking System-க்கு, free tools மட்டும் பயன்படுத்தி எப்படி build பண்ணுவது என்று ஆரம்பத்திலிருந்து deployment வரை ஒரு proper project document மாதிரி கீழே கொடுக்கிறேன்.
+
+Namma Lorry – Driver GPS & Distance Tracking
+
+Full Step-by-Step Implementation Document
+
+Goal: Driver ஒரு trip-ல் எவ்வளவு தூரம் பயணம் செய்தார் என்பதை reasonably accurately calculate செய்து, trip history மற்றும் daily KM statistics உருவாக்குவது.
+
+1. Project Goal
+
+ஒரு driver:
+
+Chennai → Bangalore
+
+என்று ஒரு trip தொடங்குகிறார்.
+
+Application:
+
+Driver-ன் GPS location எடுக்க வேண்டும்.
+
+Location-ஐ தொடர்ந்து record செய்ய வேண்டும்.
+
+Internet இல்லாவிட்டாலும் tracking நிற்கக்கூடாது.
+
+Internet வந்தவுடன் stored GPS points Supabase-க்கு sync ஆக வேண்டும்.
+
+GPS data-ல் தவறான points இருந்தால் filter செய்ய வேண்டும்.
+
+OpenStreetMap + routing engine மூலம் road-based distance கணக்கிட வேண்டும்.
+
+இறுதியில்:
+
+Trip Distance = 347.8 KM
+
+போன்ற result காட்ட வேண்டும்.
+
+பின்னர்:
+
+Today: 347.8 KM
+
+This Week: 1,248.5 KM
+
+This Month: 4,821.2 KM
+
+போன்ற driver statistics உருவாக்கலாம்.
+
+2. Completely Free / Open-Source Stack
+
+நம்ம ஆரம்ப MVP-க்கு:
+
+Requirement
+
+Technology
+
+Backend
+
+Supabase Free
+
+Database
+
+PostgreSQL
+
+Geospatial DB
+
+PostGIS
+
+Authentication
+
+Supabase Auth
+
+Live updates
+
+Supabase Realtime
+
+Map data
+
+OpenStreetMap
+
+Routing
+
+OSRM
+
+Map display
+
+Leaflet / Flutter map
+
+GPS
+
+Phone built-in GPS
+
+Offline storage
+
+SQLite / local storage
+
+Backend logic
+
+Supabase Edge Functions / application backend
+
+Source control
+
+GitHub
+
+Frontend
+
+Flutter or Web
+
+Hosting
+
+Free-tier hosting
+
+Important: OpenStreetMap itself is not a routing API. It provides map/geographic data. OSRM uses OpenStreetMap road data for routing.
+
+3. Overall Architecture
+
+                    ┌─────────────────┐
+
+                    │   DRIVER APP    │
+
+                    └────────┬────────┘
+
+                             │
+
+                         Phone GPS
+
+                             │
+
+                     Latitude/Longitude
+
+                             │
+
+                             ▼
+
+                    ┌─────────────────┐
+
+                    │ Local Storage   │
+
+                    │ Offline Queue   │
+
+                    └────────┬────────┘
+
+                             │
+
+                      Internet available?
+
+                         /          \
+
+                       NO            YES
+
+                       │              │
+
+                       │              ▼
+
+                       │       ┌─────────────┐
+
+                       │       │  Supabase   │
+
+                       │       └──────┬──────┘
+
+                       │              │
+
+                       │              ▼
+
+                       │       GPS Data Store
+
+                       │              │
+
+                       └──────────────┤
+
+                                      ▼
+
+                              GPS Validation
+
+                                      │
+
+                                      ▼
+
+                            Distance Calculation
+
+                                      │
+
+                            ┌─────────┴─────────┐
+
+                            │                   │
+
+                       GPS distance       OSRM route
+
+                            │                   │
+
+                            └─────────┬─────────┘
+
+                                      ▼
+
+                              Final Trip KM
+
+                                      │
+
+                                      ▼
+
+                              Driver Dashboard
+
+4. Database Design
+
+Supabase PostgreSQL-ல் இந்த tables உருவாக்க வேண்டும்.
+
+4.1 Drivers
+
+drivers
+
+-------------------------
+
+id
+
+name
+
+phone
+
+email
+
+status
+
+created_at
+
+Example:
+
+id: 123
+
+name: Kumar
+
+phone: **********
+
+status: active
+
+5. Vehicles
+
+vehicles
+
+-------------------------
+
+id
+
+driver_id
+
+vehicle_number
+
+vehicle_type
+
+capacity
+
+created_at
+
+Example:
+
+TN01AB1234
+
+Truck
+
+25 Ton
+
+6. Trips
+
+ஒவ்வொரு journey-க்கும் ஒரு trip.
+
+trips
+
+-------------------------
+
+id
+
+driver_id
+
+vehicle_id
+
+start_location
+
+end_location
+
+started_at
+
+ended_at
+
+status
+
+distance_km
+
+calculation_method
+
+created_at
+
+calculation_method example:
+
+GPS
+
+OSRM
+
+FALLBACK
+
+7. GPS Locations
+
+Driver பயணம் செய்யும்போது வரும் location points இங்கே சேமிக்கப்படும்.
+
+driver_locations
+
+-------------------------
+
+id
+
+trip_id
+
+driver_id
+
+latitude
+
+longitude
+
+accuracy
+
+speed
+
+heading
+
+recorded_at
+
+synced_at
+
+Example:
+
+12.9716
+
+77.5946
+
+accuracy = 8m
+
+speed = 42 km/h
+
+8. Why Accuracy Must Be Stored
+
+GPS point மட்டும் போதாது.
+
+ஒவ்வொரு GPS point-க்கும்:
+
+Latitude
+
+Longitude
+
+Accuracy
+
+Speed
+
+Timestamp
+
+Heading
+
+capture செய்வது நல்லது.
+
+Example:
+
+Point 1
+
+Lat: 12.9716
+
+Lng: 77.5946
+
+Accuracy: 7m
+
+Point 2
+
+Lat: 12.9720
+
+Lng: 77.5952
+
+Accuracy: 9m
+
+இதனால் bad GPS points detect செய்ய முடியும்.
+
+9. Driver Starts Trip
+
+Driver application-ல்:
+
+START TRIP
+
+button இருக்கும்.
+
+Click செய்தவுடன்:
+
+trip_id உருவாக்கு
+
+        ↓
+
+start timestamp
+
+        ↓
+
+GPS tracking ஆரம்பி
+
+        ↓
+
+local storage-ல் points save செய்
+
+10. GPS Tracking
+
+ஒவ்வொரு 5–10 seconds-க்கும் GPS point capture செய்யலாம்.
+
+Example:
+
+10:00:00 → 12.9716,77.5946
+
+10:00:05 → 12.9720,77.5950
+
+10:00:10 → 12.9725,77.5956
+
+10:00:15 → 12.9731,77.5961
+
+ஆனால் 5 seconds என்பது fixed requirement இல்லை.
+
+Vehicle speed, battery usage, OS restrictions ஆகியவற்றைப் பொறுத்து interval dynamically adjust செய்யலாம்.
+
+11. Internet இல்லாதபோது என்ன ஆகும்?
+
+இதுதான் நம்ம project-ன் முக்கியமான feature.
+
+Internet:
+
+NO INTERNET
+
+ஆனால் GPS:
+
+GPS = AVAILABLE
+
+GPS satellite positioning-க்கு mobile internet அவசியமில்லை.
+
+அதனால்:
+
+GPS
+
+ ↓
+
+Local SQLite
+
+ ↓
+
+Store points
+
+Internet வந்ததும்:
+
+Local SQLite
+
+ ↓
+
+Unsynced points
+
+ ↓
+
+Supabase
+
+ ↓
+
+Mark as synced
+
+12. Offline Queue
+
+ஒவ்வொரு location-க்கும்:
+
+sync_status
+
+வைக்கலாம்.
+
+Example:
+
+Point 1 → synced
+
+Point 2 → synced
+
+Point 3 → pending
+
+Point 4 → pending
+
+Internet வந்ததும்:
+
+Point 3 → Supabase
+
+Point 4 → Supabase
+
+பிறகு:
+
+pending → synced
+
+13. GPS Quality Check
+
+இது மிகவும் முக்கியமானது.
+
+சில நேரங்களில் GPS:
+
+Actual:
+
+12.9716, 77.5946
+
+GPS:
+
+13.0216, 77.6946
+
+என்று திடீரென்று jump ஆகலாம்.
+
+அப்படி இருந்தால் அதை distance calculation-ல் பயன்படுத்தக்கூடாது.
+
+14. GPS Filtering
+
+ஒவ்வொரு point-ஐ validate செய்ய வேண்டும்.
+
+Check 1 — Accuracy
+
+Example:
+
+accuracy <= 50 meters
+
+என்றால் accept.
+
+அதற்கு மேல் இருந்தால்:
+
+REJECT / LOW CONFIDENCE
+
+என்று mark செய்யலாம்.
+
+15. Check 2 — Impossible Jump
+
+Example:
+
+Previous point
+
+12.9716,77.5946
+
+New point
+
+13.0716,77.6946
+
+இரண்டு points-க்கு இடையில் 5 seconds தான் இருந்தால், vehicle அந்த distance-ஐ realistic-ஆ travel செய்திருக்க முடியுமா என்று check செய்ய வேண்டும்.
+
+Formula:
+
+speed = distance / time
+
+Example:
+
+distance = 2 km
+
+time = 5 sec
+
+இது vehicle-க்கு impossible speed என்றால்:
+
+INVALID GPS POINT
+
+16. Check 3 — GPS Jump Detection
+
+P1 ─── P2 ─── P3
+
+Normal:
+
+P1 → P2 → P3
+
+Bad GPS:
+
+P1 → P2 → X → P3
+
+          ↑
+
+       huge jump
+
+X reject செய்ய வேண்டும்.
+
+17. Distance Calculation
+
+Basic GPS distance:
+
+P1 → P2
+
+P2 → P3
+
+P3 → P4
+
+...
+
+ஒவ்வொரு valid point-க்கும் distance calculate செய்ய வேண்டும்.
+
+Distance =
+
+D(P1,P2)
+
++
+
+D(P2,P3)
+
++
+
+D(P3,P4)
+
+...
+
+இதற்கு Haversine formula பயன்படுத்தலாம்.
+
+ஆனால் இது straight-line distance between GPS points.
+
+Road distance வேறாக இருக்கலாம்.
+
+18. OpenStreetMap + OSRM
+
+இதனால் road-based distance கிடைக்கும்.
+
+Example:
+
+Start
+
+Chennai
+
+Destination
+
+Bangalore
+
+OSRM:
+
+Start
+
+ ↓
+
+Road network
+
+ ↓
+
+Destination
+
+Distance = XXX km
+
+இதனால் map-ல் vehicle செல்லும் road route-ஐ பயன்படுத்த முடியும்.
+
+19. A / B / C Model
+
+நீங்க சொன்ன idea-வை இப்படி structure பண்ணலாம்.
+
+Model A — Fixed / Known Distance
+
+Example:
+
+Chennai → Bangalore
+
+Expected distance = 350 KM
+
+இந்த model emergency fallback.
+
+Model B — GPS Distance
+
+GPS points
+
+ ↓
+
+Filter
+
+ ↓
+
+Haversine
+
+ ↓
+
+Total KM
+
+Internet இல்லாதபோதும் இது வேலை செய்யும்.
+
+Model C — GPS + OSM Routing
+
+GPS points
+
+ ↓
+
+Map matching / route processing
+
+ ↓
+
+OSRM
+
+ ↓
+
+Road distance
+
+இது available data நல்ல quality-ல் இருக்கும்போது பயன்படுத்தப்படும்.
+
+20. Model Selection
+
+நாம் blindly ஒரு model-ஐ use செய்யக்கூடாது.
+
+Flow:
+
+GPS available?
+
+      │
+
+      YES
+
+      ↓
+
+GPS quality acceptable?
+
+      │
+
+   YES │
+
+      ↓
+
+GPS distance
+
+      │
+
+      ↓
+
+OSRM validation
+
+      │
+
+      ↓
+
+Difference acceptable?
+
+      │
+
+     YES
+
+      ↓
+
+FINAL DISTANCE
+
+GPS data poor என்றால்:
+
+Model B rejected
+
+       ↓
+
+Model C / fallback
+
+       ↓
+
+Model A
+
+21. Important Correction
+
+Model A-வை default-ஆ பயன்படுத்தக்கூடாது.
+
+Example:
+
+Chennai → Bangalore = 350 km
+
+என்று fixed value வைத்தால் driver:
+
+Route 1 = 350 km
+
+Route 2 = 390 km
+
+Route 3 = 330 km
+
+என்றாலும் எல்லாவற்றையும் 350 km என்று காட்டிவிடும்.
+
+அதனால் Model A:
+
+Fallback only
+
+என்று வைத்திருப்பது safer.
+
+22. Final Distance Algorithm
+
+நம்ம system:
+
+START TRIP
+
+    ↓
+
+Capture GPS
+
+    ↓
+
+Store locally
+
+    ↓
+
+Sync when internet available
+
+    ↓
+
+Validate GPS
+
+    ↓
+
+Remove bad points
+
+    ↓
+
+Calculate GPS distance
+
+    ↓
+
+Use OSM/OSRM where available
+
+    ↓
+
+Compare results
+
+    ↓
+
+Select reliable result
+
+    ↓
+
+Store final distance
+
+23. Trip End
+
+Driver:
+
+END TRIP
+
+press செய்கிறார்.
+
+System:
+
+Stop GPS
+
+     ↓
+
+Upload remaining points
+
+     ↓
+
+Process trip
+
+     ↓
+
+Calculate distance
+
+     ↓
+
+Save final result
+
+Example:
+
+Trip ID: T1001
+
+Start:
+
+Chennai
+
+End:
+
+Bangalore
+
+Distance:
+
+347.8 KM
+
+Duration:
+
+7h 42m
+
+GPS Points:
+
+5,218
+
+Calculation:
+
+GPS + OSM/OSRM
+
+Status:
+
+Completed
+
+24. Daily Driver Statistics
+
+இதிலிருந்து:
+
+Driver Dashboard
+
+உருவாக்கலாம்.
+
+Example:
+
+Today's Distance
+
+347.8 KM
+
+Trips
+
+2
+
+Driving Time
+
+8h 12m
+
+Average Trip
+
+173.9 KM
+
+Weekly:
+
+Mon   320 KM
+
+Tue   410 KM
+
+Wed   275 KM
+
+Thu   380 KM
+
+Fri   450 KM
+
+25. Driver Rating Idea
+
+நீங்க ஆரம்பத்தில் சொன்ன driver rating concept-ஐ later add பண்ணலாம்.
+
+Example metrics:
+
+Distance travelled
+
+Trip completion
+
+GPS reliability
+
+On-time delivery
+
+Harsh braking
+
+Overspeed events
+
+ஆனால் distance மட்டும் வைத்து driver-க்கு rating கொடுக்கக்கூடாது.
+
+ஒருவர் அதிக KM ஓட்டுகிறார் என்பதால் அவர் automatically better driver என்று அர்த்தமில்லை.
+
+அதனால் rating system-ஐ தனி module-ஆ build பண்ணுவது நல்லது.
+
+26. Admin Dashboard
+
+Admin-க்கு:
+
+Drivers
+
+Vehicles
+
+Active Trips
+
+Completed Trips
+
+Live Locations
+
+Daily KM
+
+Weekly KM
+
+Monthly KM
+
+காட்டலாம்.
+
+Map:
+
+             LIVE MAP
+
+       🚚 Driver 1
+
+             ↓
+
+        ───────────
+
+             ↓
+
+       🚚 Driver 2
+
+             ↓
+
+        ───────────
+
+             ↓
+
+       📍 Destination
+
+27. Supabase Realtime
+
+Driver location update:
+
+Driver App
+
+    ↓
+
+Supabase
+
+    ↓
+
+Realtime
+
+    ↓
+
+Admin Dashboard
+
+இதனால் admin refresh செய்யாமல் driver location update ஆகலாம்.
+
+28. Security
+
+Driver ஒருவர் மற்ற driver-ன் location பார்க்கக்கூடாது.
+
+Supabase Row Level Security (RLS) பயன்படுத்த வேண்டும்.
+
+Example:
+
+Driver A
+
+   ↓
+
+Can read:
+
+Own trips
+
+Cannot read:
+
+Driver B trips
+
+Admin:
+
+Admin
+
+ ↓
+
+Can view authorized drivers
+
+29. Folder Structure
+
+Flutter எடுத்தால்:
+
+lib/
+
+│
+
+├── main.dart
+
+│
+
+├── screens/
+
+│   ├── login.dart
+
+│   ├── driver_home.dart
+
+│   ├── trip_screen.dart
+
+│   └── trip_history.dart
+
+│
+
+├── services/
+
+│   ├── gps_service.dart
+
+│   ├── supabase_service.dart
+
+│   ├── routing_service.dart
+
+│   └── sync_service.dart
+
+│
+
+├── database/
+
+│   └── local_database.dart
+
+│
+
+├── models/
+
+│   ├── driver.dart
+
+│   ├── trip.dart
+
+│   └── location.dart
+
+│
+
+└── utils/
+
+    ├── gps_filter.dart
+
+    └── distance_calculator.dart
+
+30. Development Order
+
+எல்லாவற்றையும் ஒரே நேரத்தில் build பண்ணாதீங்க.
+
+இந்த order-ல் செய்யுங்கள்:
+
+Phase 1 — Basic App
+
+Login
+
+ ↓
+
+Driver Home
+
+ ↓
+
+Start Trip
+
+ ↓
+
+Stop Trip
+
+Phase 2 — GPS
+
+Start Trip
+
+ ↓
+
+GPS tracking
+
+ ↓
+
+Location points
+
+Phase 3 — Local Storage
+
+GPS
+
+ ↓
+
+SQLite
+
+Phase 4 — Supabase
+
+SQLite
+
+ ↓
+
+Supabase
+
+Phase 5 — Offline Sync
+
+No Internet
+
+ ↓
+
+Local queue
+
+Internet returns
+
+ ↓
+
+Auto sync
+
+Phase 6 — Distance
+
+GPS points
+
+ ↓
+
+Filtering
+
+ ↓
+
+Haversine
+
+ ↓
+
+KM
+
+Phase 7 — OSM
+
+OpenStreetMap
+
+ ↓
+
+OSRM
+
+ ↓
+
+Road route
+
+Phase 8 — A/B/C
+
+GPS
+
+OSM/OSRM
+
+Fallback
+
+ ↓
+
+Confidence selection
+
+Phase 9 — Dashboard
+
+Daily KM
+
+Weekly KM
+
+Monthly KM
+
+Trip history
+
+Phase 10 — Testing
+
+Real vehicle-ல் test செய்ய வேண்டும்.
+
+31. Testing Plan
+
+ஒரு real trip:
+
+Chennai → Vellore
+
+எடுத்துக்கொண்டு:
+
+Test 1
+
+Internet ON.
+
+Check:
+
+GPS
+
+Distance
+
+Route
+
+Supabase
+
+Test 2
+
+Internet OFF.
+
+Check:
+
+GPS continues?
+
+Local storage works?
+
+Test 3
+
+Internet OFF → ON.
+
+Check:
+
+Pending points sync?
+
+No duplicate points?
+
+Test 4
+
+GPS jump simulation.
+
+Check:
+
+Bad point rejected?
+
+Test 5
+
+Phone screen locked.
+
+Check:
+
+Background tracking continues?
+
+இந்த test mobile OS permissions காரணமாக மிகவும் முக்கியம்.
+
+32. Free-Tier Reality
+
+நம்ம ஆரம்ப MVP:
+
+₹0 infrastructure cost-ல் தொடங்க முடியும், provided the free-tier limits and third-party service usage policies are respected.
+
+ஆனால்:
+
+100 drivers
+
+1000 drivers
+
+10,000 drivers
+
+என்று scale ஆகும்போது free tiers போதாமல் போகலாம்.
+
+அதனால் architecture-ஐ ஆரம்பத்திலேயே scalable-ஆ வைத்துக்கொள்ள வேண்டும்.
+
+33. Final MVP
+
+முதல் version-ல் இதை மட்டும் complete பண்ணுங்கள்:
+
+                 NAMMA LORRY
+
+                 Driver Login
+
+                      ↓
+
+                 Start Trip
+
+                      ↓
+
+                  Phone GPS
+
+                      ↓
+
+             Local GPS Storage
+
+                      ↓
+
+              Internet Available?
+
+                 /           \
+
+               NO             YES
+
+               ↓               ↓
+
+           Local Queue      Supabase
+
+               │               │
+
+               └───────┬───────┘
+
+                       ↓
+
+                 GPS Validation
+
+                       ↓
+
+                 Distance Engine
+
+                       ↓
+
+              OSM + OSRM validation
+
+                       ↓
+
+                 Final Trip KM
+
+                       ↓
+
+                 Trip Completed
+
+                       ↓
+
+                 Driver History
+
+                       ↓
+
+                Admin Dashboard
+
+இதுதான் நம்ம actual core product.
+
+முதலில் “driver எவ்வளவு KM travel செய்தார்?” என்பதை reliable-ஆ solve பண்ணுவோம். அதுக்குப் பிறகு driver rating, fuel analytics, route optimization, ETA, fraud detection போன்றவற்றை சேர்க்கலாம்.
+
+HantiGravity-க்கு கொடுக்க வேண்டிய implementation document இதை அடிப்படையாக வைத்தால், அது project-ஐ module-by-module build செய்ய தெளிவான specification ஆக இருக்கும்.

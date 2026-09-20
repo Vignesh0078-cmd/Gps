@@ -1,0 +1,12 @@
+{
+  "name": "namma-lorry-gps",
+  "version": "1.0.0",
+  "description": "Namma Lorry — Driver GPS & Distance Tracking System",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8080"
+  },
+  "keywords": ["gps", "tracking", "logistics", "telemetry"],
+  "author": "Namma Lorry",
+  "license": "ISC"
+}

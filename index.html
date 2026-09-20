@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Namma Lorry — Driver GPS & Distance Tracking System</title>
+  <meta name="description" content="Production-ready Driver GPS tracking, offline queue, noise filtering, and multi-model distance calculation system for Namma Lorry.">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Design Tokens & Stylesheets -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <img src="assets/logoICON.jpeg" alt="Namma Lorry Logo" class="brand-logo" onerror="this.style.display='none'">
+        <div class="brand-title-wrap">
+          <div class="brand-name">NAMMA <span>LORRY</span></div>
+          <div class="brand-subtitle">Driver GPS & Distance Telemetry</div>
+        </div>
+      </div>
+
+      <!-- Center View Switcher -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-view="view-cockpit" id="tabCockpit">
+          <span>📱</span> Driver Cockpit
+        </button>
+        <button class="nav-tab" data-view="view-analytics" id="tabAnalytics">
+          <span>📊</span> Driver Analytics
+        </button>
+        <button class="nav-tab" data-view="view-fleet" id="tabFleet">
+          <span>🚛</span> Admin Fleet Map
+        </button>
+        <button class="nav-tab" data-view="view-lab" id="tabLab">
+          <span>🧪</span> Algorithm Lab
+        </button>
+      </nav>
+
+      <!-- Right Header Actions -->
+      <div class="header-actions">
+        <!-- Interactive Network Simulator Toggle (Section 11 & 12) -->
+        <button class="network-toggle" id="networkToggleBtn" title="Click to toggle between Online (Supabase) and Simulated Offline Mode">
+          <span class="pulsing-dot online" id="networkStatusDot"></span>
+          <span id="networkStatusText">ONLINE</span>
+          <span class="badge badge-warning" id="queueCounterBadge" style="display: none; margin-left: 4px;">0 PENDING</span>
+        </button>
+
+        <!-- Driver Profile Indicator -->
+        <div class="driver-profile-pill">
+          <div class="driver-avatar" id="headerDriverAvatar">K</div>
+          <div class="driver-details">
+            <div class="driver-name" id="headerDriverName">Kumar K.</div>
+            <div class="driver-lorry" id="headerDriverVehicle">TN 01 AB 1234 (25 Ton)</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dynamic Views -->
+    <main class="main-content">
+
+      <!-- ============================================================
+           VIEW 1: DRIVER MOBILE COCKPIT & LIVE TELEMETRY
+           ============================================================ -->
+      <section class="view-section active" id="view-cockpit">
+        <div class="cockpit-layout">
+
+          <!-- Left Cockpit Side Panel -->
+          <div class="cockpit-panel">
+
+            <!-- Active Trip Control Card -->
+            <div class="card trip-control-card">
+              <div class="trip-status-header">
+                <div>
+                  <span class="badge badge-accent" id="hudTripBadge">READY TO START</span>
+                  <span style="font-family: var(--nl-font-mono); font-size: 0.75rem; color: var(--nl-text-muted); margin-left: 8px;" id="hudTripId">--</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--nl-text-secondary);">
+                  Session: <strong style="color: #ffffff;">Active</strong>
+                </div>
+              </div>
+
+              <!-- Journey Origin & Destination Card (Pure GPS Track) -->
+              <div class="journey-locations-card">
+                <!-- Start Point -->
+                <div class="location-point-row start">
+                  <div class="location-marker-icon start-icon">
+                    <span>🟢</span>
+                  </div>
+                  <div class="location-point-content">
+                    <div class="location-point-header">
+                      <span class="location-label">Start Location (Your GPS)</span>
+                      <span class="location-status-badge ready" id="hudStartStatus">DETECTING...</span>
+                    </div>
+                    <div class="location-name" id="hudStartPlace">Locating via GPS...</div>
+                    <div class="location-coords" id="hudStartCoords">Acquiring GNSS fix...</div>
+                  </div>
+                </div>
+
+                <div class="journey-connector-line">
+                  <div class="connector-dot"></div>
+                  <div class="connector-dash"></div>
+                  <div class="connector-dot"></div>
+                </div>
+
+                <!-- Stop Point -->
+                <div class="location-point-row stop">
+                  <div class="location-marker-icon stop-icon">
+                    <span>🛑</span>
+                  </div>
+                  <div class="location-point-content">
+                    <div class="location-point-header">
+                      <span class="location-label">Stopping Location (Where You Stop)</span>
+                      <span class="location-status-badge pending" id="hudStopStatus">AWAITING STOP</span>
+                    </div>
+                    <div class="location-name" id="hudStopPlace">Captured when you press Stop Trip</div>
+                    <div class="location-coords" id="hudStopCoords">--</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Start / End Trip Buttons -->
+              <div style="margin-top: 10px; margin-bottom: 12px;">
+                <button class="btn btn-primary btn-trip-action" id="btnStartTrip" style="width: 100%;">
+                  <span>🚀</span> START TRIP FROM MY GPS
+                </button>
+                <button class="btn btn-danger btn-trip-action" id="btnEndTrip" style="display: none; width: 100%;">
+                  <span>🛑</span> STOP TRIP &amp; RECORD STOPPING POINT
+                </button>
+              </div>
+
+              <!-- GPS Helper Actions -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <button class="btn btn-secondary btn-sm" id="btnRecalibrateGps" title="Refresh GPS coordinates and address" style="font-size: 0.72rem; padding: 4px 8px;">
+                  <span>🔄</span> Refresh My GPS
+                </button>
+                <span style="font-size: 0.72rem; color: var(--nl-text-muted);" id="gpsLockAccuracyNotice">GNSS Accuracy: ±--m</span>
+              </div>
+
+              <!-- Live Telemetry HUD -->
+              <div class="hud-grid">
+                <div class="hud-tile">
+                  <div class="hud-label">
+                    <span>Speed</span>
+                    <span style="color: var(--nl-success);">LIVE</span>
+                  </div>
+                  <div class="hud-value-row">
+                    <span class="hud-value" id="hudSpeed">0</span>
+                    <span class="hud-unit">km/h</span>
+                  </div>
+                </div>
+
+                <div class="hud-tile">
+                  <div class="hud-label">
+                    <span>Trip Distance</span>
+                    <span>KM</span>
+                  </div>
+                  <div class="hud-value-row">
+                    <span class="hud-value" id="hudDistance" style="color: var(--nl-accent);">0.0</span>
+                    <span class="hud-unit">km</span>
+                  </div>
+                </div>
+
+                <div class="hud-tile">
+                  <div class="hud-label">
+                    <span>Duration</span>
+                    <span>TIME</span>
+                  </div>
+                  <div class="hud-value-row">
+                    <span class="hud-value" id="hudDuration">00:00</span>
+                  </div>
+                </div>
+
+                <div class="hud-tile">
+                  <div class="hud-label">
+                    <span>GPS Accuracy</span>
+                    <span style="color: var(--nl-cyan);">GNSS</span>
+                  </div>
+                  <div class="hud-value-row">
+                    <span class="hud-value" id="hudAccuracy" style="font-size: 1.4rem;">--</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Collapsible Developer / Corridor Simulation Tool (Optional) -->
+              <details class="sim-details-toggle" id="simDetailsToggle" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+                <summary style="cursor: pointer; font-size: 0.75rem; color: var(--nl-text-muted); outline: none;">
+                  🧪 Corridor Replay Simulator (Test / Demo Only)
+                </summary>
+                <div style="padding-top: 10px;">
+                  <div class="route-selector-group">
+                    <label for="trackingModeSelect">Tracking Mode</label>
+                    <select id="trackingModeSelect" class="select-input">
+                      <option value="device" selected>Real Device GPS (Primary Mode)</option>
+                      <option value="simulation">Corridor Replay Simulator (Test Mode)</option>
+                    </select>
+                  </div>
+                  <div class="route-selector-group" id="corridorGroup" style="display: none;">
+                    <label for="corridorSelect">Simulation Route Corridor</label>
+                    <select id="corridorSelect" class="select-input">
+                      <option value="chennai_sriperumbudur">Chennai Port ➔ Sriperumbudur (42 km)</option>
+                      <option value="chennai_vellore">Chennai Port ➔ Vellore Hub (138 km)</option>
+                      <option value="chennai_bengaluru">Chennai Port ➔ Bengaluru (348.5 km)</option>
+                    </select>
+                  </div>
+                  <div class="sim-speed-pills" style="margin-top: 8px;">
+                    <button class="speed-pill" data-speed="1">1×</button>
+                    <button class="speed-pill" data-speed="2">2×</button>
+                    <button class="speed-pill active" data-speed="5">5×</button>
+                    <button class="speed-pill" data-speed="10">10×</button>
+                    <button class="speed-pill" data-speed="20">20×</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <!-- GPS Quality & Queue Status Card (Sections 8, 12, 14) -->
+            <div class="card quality-card">
+              <div style="font-size: 0.8rem; font-weight: 700; color: #ffffff; margin-bottom: 12px; display: flex; justify-content: space-between;">
+                <span>🛡️ Real-Time GPS Quality Guard</span>
+                <span class="badge badge-success">ACTIVE</span>
+              </div>
+
+              <div class="telemetry-row">
+                <span class="telemetry-title">Accuracy Filter (&le; 50m)</span>
+                <span class="telemetry-val" style="color: var(--nl-success);" id="telemetryAccuracyRule">PASSED</span>
+              </div>
+
+              <div class="telemetry-row">
+                <span class="telemetry-title">Impossible Jump Filter (&le; 120 km/h)</span>
+                <span class="telemetry-val" style="color: var(--nl-success);">MONITORING</span>
+              </div>
+
+              <div class="telemetry-row">
+                <span class="telemetry-title">Valid Points Accepted</span>
+                <span class="telemetry-val" style="color: var(--nl-info);" id="telemetryValidPoints">0</span>
+              </div>
+
+              <div class="telemetry-row">
+                <span class="telemetry-title">Noise Points Rejected</span>
+                <span class="telemetry-val" style="color: var(--nl-error);" id="telemetryRejectedPoints">0</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Interactive Map View -->
+          <div class="map-view-wrapper">
+            <!-- Map Top Overlay Floating HUD -->
+            <div class="map-overlay-badge">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="pulsing-dot online"></span>
+                <strong style="font-size: 0.82rem; color: #ffffff;">Live Freight Tracking</strong>
+              </div>
+              <div style="height: 14px; width: 1px; background: rgba(255,255,255,0.15);"></div>
+              <div style="font-size: 0.75rem; color: var(--nl-text-secondary);">
+                Points: <strong style="color: #ffffff;" id="hudPointsCount">0</strong>
+              </div>
+            </div>
+
+            <!-- Floating Map Actions -->
+            <div class="map-controls-group">
+              <button class="map-btn" id="btnCenterTruck" title="Center map on vehicle">
+                <span>🎯</span> Center Truck
+              </button>
+              <button class="map-btn" id="btnFitRoute" title="Fit entire route bounds">
+                <span>📐</span> Fit Route
+              </button>
+            </div>
+
+            <!-- The Leaflet Map Container -->
+            <div id="driverMap"></div>
+
+            <!-- Map Legend -->
+            <div class="map-legend">
+              <div class="legend-item">
+                <span class="legend-line gps"></span>
+                <span>Valid GPS Trace (Model B)</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-line osrm"></span>
+                <span>Road Snapped Route (Model C)</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot bad"></span>
+                <span>Filtered Out Noise (Spike / Accuracy)</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 2: DRIVER STATISTICS & TRIP HISTORY (Section 24)
+           ============================================================ -->
+      <section class="view-section" id="view-analytics">
+        <!-- Driver KPI Summary Cards (Real Data Only) -->
+        <div class="stats-overview-grid">
+          <div class="stat-card">
+            <div class="stat-card-title">Today's Distance</div>
+            <div class="stat-card-value" id="statTodayKm">0.0 KM</div>
+            <div class="stat-card-sub" id="statTodaySub">Real-time GPS telemetry</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-card-title">Trips Completed Today</div>
+            <div class="stat-card-value" id="statTodayTrips">0</div>
+            <div class="stat-card-sub" id="statTodayAvgSub">Live trip tracking</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-card-title">Total Driving Time</div>
+            <div class="stat-card-value" id="statTodayHours">0.0h</div>
+            <div class="stat-card-sub">Active duty time</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-card-title">This Month Total</div>
+            <div class="stat-card-value" id="statMonthlyKm">0.0 KM</div>
+            <div class="stat-card-sub">Weekly: <strong style="color: #ffffff;" id="statWeeklyKm">0.0 KM</strong></div>
+          </div>
+        </div>
+
+        <!-- Weekly Distance Chart (Real Data Only) -->
+        <div class="chart-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+              <h3>Weekly Distance Traveled</h3>
+              <p style="font-size: 0.8rem; margin-top: 2px;" id="chartDriverSubtitle">Daily kilometer breakdown from real completed trips</p>
+            </div>
+            <span class="badge badge-accent" id="chartWeekBadge">THIS WEEK: 0.0 KM</span>
+          </div>
+
+          <div class="weekly-bar-container">
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Mon">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill" id="barFill_Mon" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Mon</span>
+            </div>
+
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Tue">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill" id="barFill_Tue" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Tue</span>
+            </div>
+
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Wed">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill" id="barFill_Wed" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Wed</span>
+            </div>
+
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Thu">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill" id="barFill_Thu" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Thu</span>
+            </div>
+
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Fri">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill" id="barFill_Fri" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Fri</span>
+            </div>
+
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Sat">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill active" id="barFill_Sat" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Sat</span>
+            </div>
+
+            <div class="bar-col">
+              <span class="bar-val-label" id="barVal_Sun">0 km</span>
+              <div class="bar-pill-track">
+                <div class="bar-fill" id="barFill_Sun" style="height: 4%;"></div>
+              </div>
+              <span class="bar-day-label">Sun</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trip History Table (Real Data Only) -->
+        <div class="table-card">
+          <div style="margin-bottom: 16px;">
+            <h3>Trip History & Calculation Audit Log</h3>
+            <p style="font-size: 0.8rem; margin-top: 2px;">Comprehensive record of real completed trips and verification methods</p>
+          </div>
+
+          <table class="nl-table">
+            <thead>
+              <tr>
+                <th>Trip ID</th>
+                <th>Corridor & Destination</th>
+                <th>Distance (KM)</th>
+                <th>Method Selected</th>
+                <th>Duration</th>
+                <th>Confidence</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tripHistoryTableBody">
+              <!-- Dynamically rendered by app.js from real store/Supabase trips -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 3: ADMIN FLEET COMMAND (Real Data Only)
+           ============================================================ -->
+      <section class="view-section" id="view-fleet">
+        <div class="admin-grid">
+          <!-- Live Multi-Vehicle Map -->
+          <div class="map-view-wrapper">
+            <div class="map-overlay-badge">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="pulsing-dot online"></span>
+                <strong style="font-size: 0.82rem; color: #ffffff;">Supabase Realtime Fleet Cockpit</strong>
+              </div>
+              <span class="badge badge-success" id="fleetActiveCountBadge">0 ACTIVE LORRIES</span>
+            </div>
+            <div id="adminFleetMap"></div>
+          </div>
+
+          <!-- Fleet List Side Panel -->
+          <div class="fleet-list-panel">
+            <div class="card" style="margin-bottom: 6px;">
+              <h3 style="font-size: 1.05rem;">Fleet Overview</h3>
+              <p style="font-size: 0.78rem; margin-top: 4px;">Live real-time tracking across active corridors</p>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+                <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: var(--radius-sm);">
+                  <div style="font-size: 0.7rem; color: var(--nl-text-muted);">FLEET DISTANCE TODAY</div>
+                  <div style="font-size: 1.25rem; font-weight: 800; font-family: var(--nl-font-mono); color: #ffffff;" id="fleetTodayDistance">0.0 KM</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.25); padding: 10px; border-radius: var(--radius-sm);">
+                  <div style="font-size: 0.7rem; color: var(--nl-text-muted);">SYNC HEALTH</div>
+                  <div style="font-size: 1.25rem; font-weight: 800; font-family: var(--nl-font-mono); color: var(--nl-success);" id="fleetSyncHealth">100%</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Real-time Dynamic Vehicle Cards -->
+            <div id="fleetVehiclesContainer" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Dynamically populated from real vehicle locations -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 4: ALGORITHM TESTING LAB (Section 31 Testing Plan)
+           ============================================================ -->
+      <section class="view-section" id="view-lab">
+        <div class="test-suite-layout">
+
+          <!-- Left: Test Cases List -->
+          <div class="test-cases-panel">
+            <div class="card" style="margin-bottom: 8px;">
+              <h3>Specification Test Suite</h3>
+              <p style="font-size: 0.8rem; margin-top: 4px;">
+                Automated tests defined in <strong>Section 31</strong> of <code>gps.docx</code>.
+              </p>
+              <div style="margin-top: 14px; display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm" id="btnRunAllTests">
+                  <span>⚡</span> Run All Section 31 Tests
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btnClearLogs">
+                  Clear Log
+                </button>
+              </div>
+            </div>
+
+            <!-- Test Case 1 -->
+            <div class="test-case-item">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 0.9rem;">Test 1: Internet ON</h4>
+                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="1">Run</button>
+              </div>
+              <p style="font-size: 0.75rem; margin-top: 6px;">
+                Validates real-time GPS point capture, Haversine accumulation, OSRM road match, and direct Supabase sync.
+              </p>
+            </div>
+
+            <!-- Test Case 2 -->
+            <div class="test-case-item">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 0.9rem;">Test 2: Internet OFF</h4>
+                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="2">Run</button>
+              </div>
+              <p style="font-size: 0.75rem; margin-top: 6px;">
+                Simulates internet disconnection. Verifies GPS recording continues locally in queue with <code>pending</code> status.
+              </p>
+            </div>
+
+            <!-- Test Case 3 -->
+            <div class="test-case-item">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 0.9rem;">Test 3: Internet OFF ➔ ON</h4>
+                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="3">Run</button>
+              </div>
+              <p style="font-size: 0.75rem; margin-top: 6px;">
+                Simulates reconnection. Verifies all queued points batch-sync with zero duplication.
+              </p>
+            </div>
+
+            <!-- Test Case 4 -->
+            <div class="test-case-item">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 0.9rem;">Test 4: GPS Jump Simulation</h4>
+                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="4">Run</button>
+              </div>
+              <p style="font-size: 0.75rem; margin-top: 6px;">
+                Injects poor accuracy (85m) and impossible leap point. Verifies rejection by Filter Checks 1 and 2.
+              </p>
+            </div>
+
+            <!-- Test Case 5 -->
+            <div class="test-case-item">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 0.9rem;">Test 5: Dynamic Interval & Battery</h4>
+                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="5">Run</button>
+              </div>
+              <p style="font-size: 0.75rem; margin-top: 6px;">
+                Validates dynamic adjustment of GPS capture interval based on vehicle speed to prevent phone battery drain.
+              </p>
+            </div>
+          </div>
+
+          <!-- Right: Diagnostic Console Log Output -->
+          <div class="test-log-console" id="testConsole">
+            <div class="log-entry log-info">[SYSTEM READY] Namma Lorry Algorithm Lab initialized. Select a test or run all to view live diagnostic logs.</div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ============================================================
+         MODAL: TRIP COMPLETED & MULTI-MODEL AUDIT SUMMARY (Section 23)
+         ============================================================ -->
+    <div class="modal-backdrop" id="tripSummaryModal">
+      <div class="modal-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <span class="badge badge-success">TRIP COMPLETED SUCCESSFULLY</span>
+            <h2 style="margin-top: 6px;" id="modalTripId">TRP-1001</h2>
+            <div style="font-size: 0.85rem; color: var(--nl-text-secondary); margin-top: 2px;" id="modalRoute">
+              Start: -- ➔ Stop: --
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnCloseModal">✕ Close</button>
+        </div>
+
+        <!-- Start & Stop Summary Card in Modal -->
+        <div style="background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); border-radius: var(--radius-md); padding: 12px 14px; margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.1rem;">🟢</span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 0.68rem; color: var(--nl-text-muted); text-transform: uppercase;">Start Location (Your GPS)</div>
+              <div style="font-size: 0.88rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="modalStartLoc">--</div>
+            </div>
+          </div>
+          <div style="height: 1px; background: rgba(255,255,255,0.06); margin: 2px 0;"></div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.1rem;">🛑</span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 0.68rem; color: var(--nl-text-muted); text-transform: uppercase;">Stopping Location (Where You Stopped)</div>
+              <div style="font-size: 0.88rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="modalStopLoc">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Big Metric Banner -->
+        <div style="background: rgba(0, 20, 40, 0.8); border: 1px solid rgba(253, 101, 30, 0.3); border-radius: var(--radius-md); padding: 18px; margin: 20px 0 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--nl-text-muted); text-transform: uppercase;">Final Verified Mileage</div>
+            <div style="font-size: 2.6rem; font-weight: 800; font-family: var(--nl-font-mono); color: var(--nl-accent); line-height: 1;" id="modalDistance">42.4 KM</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.75rem; color: var(--nl-text-muted);">CALCULATION METHOD</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff;" id="modalMethod">Model C (OSRM Road)</div>
+            <span class="badge badge-cyan" style="margin-top: 4px;" id="modalConfidence">High (99.4%)</span>
+          </div>
+        </div>
+
+        <!-- Multi-Model Comparison (A / B / C) -->
+        <h4 style="font-size: 0.88rem; margin-bottom: 8px;">Multi-Model Distance Comparison (Section 19)</h4>
+        <div class="model-comparison-grid">
+          <div class="model-box" id="modalModelABox">
+            <span class="model-name">Model A (Fallback)</span>
+            <span class="model-km" id="modelAKm">42.0 KM</span>
+            <span class="model-desc">Known highway corridor baseline</span>
+          </div>
+
+          <div class="model-box" id="modalModelBBox">
+            <span class="model-name">Model B (GPS Haversine)</span>
+            <span class="model-km" id="modelBKm">41.8 KM</span>
+            <span class="model-desc">Filtered points geodesic sum (offline)</span>
+          </div>
+
+          <div class="model-box chosen" id="modalModelCBox">
+            <span class="model-name">Model C (OSRM Road)</span>
+            <span class="model-km" id="modelCKm">42.4 KM</span>
+            <span class="model-desc">OpenStreetMap road network matched</span>
+          </div>
+        </div>
+
+        <!-- Rationale & Quality Audit Details -->
+        <div style="background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); border-radius: var(--radius-md); padding: 14px; font-size: 0.8rem; color: var(--nl-text-secondary); margin-bottom: 20px;">
+          <strong style="color: #ffffff;">Decision Rationale:</strong>
+          <span id="modalRationale">Road-snapped OpenStreetMap distance matches recorded GPS within 15%. Model C selected.</span>
+        </div>
+
+        <!-- Quality Metrics Grid -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">TOTAL GPS POINTS</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;" id="modalPointsTotal">16</div>
+          </div>
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">VALID ACCEPTED</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--nl-success);" id="modalPointsValid">14</div>
+          </div>
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">NOISE FILTERED</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--nl-error);" id="modalPointsRejected">2</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">DURATION</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;" id="modalDuration">65 min</div>
+          </div>
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">AVERAGE SPEED</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;" id="modalAvgSpeed">39.1 km/h</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Supabase JS SDK (must load before config / sync engine) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Application Logic Modules (Strict dependency order) -->
+  <script src="js/config.js?v=3.0"></script>
+  <script src="js/store.js?v=3.0"></script>
+  <script src="js/gps_filter.js?v=3.0"></script>
+  <script src="js/distance_engine.js?v=3.0"></script>
+  <script src="js/sync_engine.js?v=3.0"></script>
+  <script src="js/simulation_routes.js?v=3.0"></script>
+  <script src="js/gps_tracker.js?v=3.0"></script>
+  <script src="js/map_manager.js?v=3.0"></script>
+  <script src="js/test_runner.js?v=3.0"></script>
+  <script src="js/app.js?v=3.0"></script>
+</body>
+</html>

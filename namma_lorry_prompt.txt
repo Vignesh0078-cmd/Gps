@@ -1,0 +1,1330 @@
+<USER_REQUEST>
+MASTER PROMPT — NAMMA LORRY FULLY WORKING MVP PROTOTYPE
+
+Build a polished, fully interactive, end-to-end MVP prototype for my startup:
+
+NAMMA LORRY
+
+IMPORTANT:
+This is a presentation-ready working MVP prototype.
+It must behave like a real product from the user's perspective.
+
+I am NOT asking for a static design, wireframe, screenshot, mockup, or concept page.
+
+I need a REAL CLICKABLE FRONTEND PROTOTYPE where the complete workflow works end-to-end using realistic simulated application data and real map/geospatial visualization.
+
+Use the uploaded Namma Lorry ZIP/code/screens as the main UI reference.
+Use the uploaded official Namma Lorry logo exactly.
+Do not replace the logo with another logo.
+Do not redesign the brand identity unnecessarily.
+
+========================================================
+1. PRIMARY OBJECTIVE
+========================================================
+
+Build a single coherent Namma Lorry MVP that demonstrates the entire logistics workflow:
+
+CUSTOMER / SHIPPER
+    ↓
+POST LOAD
+    ↓
+FREIGHT ESTIMATE
+    ↓
+FIND SUITABLE LORRIES
+    ↓
+MATCH / RECOMMENDATION
+    ↓
+DRIVER RECEIVES REQUEST
+    ↓
+DRIVER ACCEPTS
+    ↓
+BOOKING CONFIRMED
+    ↓
+TRIP CREATED
+    ↓
+LIVE MAP / TRIP TRACKING
+    ↓
+TRIP MILESTONES
+    ↓
+DELAY / EXCEPTION
+    ↓
+RECOMMENDED ACTION
+    ↓
+DELIVERY
+    ↓
+e-POD
+    ↓
+TRIP COMPLETED
+    ↓
+TRIP EARNINGS / PROFITABILITY
+    ↓
+RETURN-LOAD RECOMMENDATION
+
+The entire flow must be navigable by clicking buttons.
+
+There must be no dead-end buttons.
+
+========================================================
+2. THIS IS A PROTOTYPE, BUT IT MUST FEEL REAL
+========================================================
+
+No backend is required for this presentation prototype.
+
+Use:
+- local application state
+- mock JSON/data models
+- realistic simulated events
+- deterministic state transitions
+- localStorage where useful
+
+But the user experience must feel like a real logistics platform.
+
+For example:
+
+Post Load
+→ load created
+
+Find Lorry
+→ matching results appear
+
+Accept Trip
+→ booking becomes confirmed
+
+Start Trip
+→ active trip begins
+
+Track Live
+→ truck moves on a real map
+
+Simulate Delay
+→ ETA changes and exception appears
+
+Resolve Exception
+→ trip state updates
+
+Complete Delivery
+→ e-POD flow opens
+
+Generate e-POD
+→ trip becomes completed
+
+View Return Load
+→ recommended next load appears
+
+Every state transition should be reflected consistently across the application.
+
+========================================================
+3. SINGLE SOURCE OF TRUTH FOR DEMO STATE
+========================================================
+
+Create one centralized frontend demo state/store.
+
+All screens must read from the same state.
+
+Example entities:
+
+- currentUser
+- role
+- customer
+- driver
+- vehicle
+- load
+- match
+- booking
+- trip
+- GPS location
+- ETA
+- trip status
+- exception
+- POD
+- earnings
+- returnLoad
+
+Do NOT hardcode different conflicting values on different screens.
+
+Example:
+
+If the driver accepts:
+
+NL-482
+
+then the customer, driver and admin views must all show:
+
+NL-482
+
+If trip progress changes to 62%, every relevant screen should reflect it.
+
+If ETA changes, all relevant screens should update.
+
+========================================================
+4. DEMO SCENARIO
+========================================================
+
+Use one primary demo shipment throughout the application.
+
+SHIPPER:
+Ashok Traders
+
+TRUCK:
+NL-482
+
+DRIVER:
+Murugan S.
+
+ROUTE:
+Chennai, Tamil Nadu
+→
+Bengaluru, Karnataka
+
+CARGO:
+12 Ton Industrial Goods
+
+VEHICLE:
+10 Wheeler
+
+DISTANCE:
+approximately 346 km
+
+FREIGHT:
+₹32,500
+
+Use realistic but clearly simulated values.
+
+Do not claim that any simulated business data is real.
+
+========================================================
+5. USER ROLES
+========================================================
+
+Implement 3 main demo roles:
+
+1. SHIPPER
+2. DRIVER
+3. ADMIN / OPERATIONS
+
+Provide a very simple demo role switch/login.
+
+For example:
+
+Demo Access
+
+[ Shipper ]
+[ Driver ]
+[ Admin ]
+
+Switching roles should show the corresponding interface using the same underlying demo trip state.
+
+========================================================
+6. SHIPPER EXPERIENCE
+========================================================
+
+Create:
+
+SHIPPER HOME
+
+Show:
+
+- Namma Lorry logo
+- welcome/customer identity
+- active shipment
+- post-load CTA
+- recent loads
+- current trip status
+- live GPS status
+- support/contact
+
+Primary action:
+
+[ + POST A LOAD ]
+
+========================================================
+7. POST LOAD FLOW
+========================================================
+
+Create a clean form:
+
+Pickup
+Drop
+Cargo
+Weight
+Vehicle Type
+Pickup Date
+Pickup Time
+
+Use:
+
+Chennai
+Bengaluru
+12 Ton
+10 Wheeler
+
+Primary button:
+
+[ FIND LORRY ]
+
+On click:
+
+- validate fields
+- create simulated load
+- transition to matching screen
+- show loading/matching state briefly
+- show matching results
+
+========================================================
+8. MATCHING EXPERIENCE
+========================================================
+
+Show 3 simulated suitable lorries.
+
+Example:
+
+NL-482
+10 Wheeler
+16T capacity
+8 km away
+GPS Live
+Available
+
+NL-421
+10 Wheeler
+16T capacity
+13 km away
+GPS Live
+
+NL-391
+12 Wheeler
+18T capacity
+6 km away
+GPS Recent
+
+Highlight one recommended truck.
+
+Use:
+
+BEST MATCH
+
+Why?
+
+✓ Correct capacity
+✓ Correct vehicle type
+✓ Available
+✓ GPS active
+✓ Near pickup
+✓ Route suitable
+
+Do NOT create a fake futuristic AI screen.
+
+This must look like normal, professional logistics software.
+
+Button:
+
+[ SELECT RECOMMENDED LORRY ]
+
+========================================================
+9. BOOKING FLOW
+========================================================
+
+After selection:
+
+Show:
+
+BOOKING CONFIRMED
+
+Trip:
+Chennai → Bengaluru
+
+Truck:
+NL-482
+
+Driver:
+Murugan S.
+
+Freight:
+₹32,500
+
+Pickup ETA:
+24 min
+
+GPS:
+Live
+
+Button:
+
+[ VIEW ACTIVE TRIP ]
+
+Also update the driver state so that the driver sees the new load request.
+
+========================================================
+10. DRIVER EXPERIENCE
+========================================================
+
+Create a driver home/cockpit based closely on the uploaded reference UI.
+
+Show:
+
+Driver:
+Murugan S.
+
+Vehicle:
+NL-482
+
+Availability:
+ONLINE / OFFLINE
+
+Current earnings
+Trips
+Rating
+Fuel/FASTag summary if visually useful
+
+Main card:
+
+NEW LOAD REQUEST
+
+Chennai → Bengaluru
+12 Ton
+10 Wheeler
+₹32,500
+
+Buttons:
+
+[ ACCEPT TRIP ]
+[ DECLINE ]
+
+When ACCEPT is clicked:
+
+- booking becomes confirmed
+- driver becomes assigned
+- current trip becomes active
+- shipper is updated
+- admin is updated
+
+========================================================
+11. ACTIVE TRIP
+========================================================
+
+Create a polished driver active-trip screen.
+
+Show:
+
+Trip ID
+Route
+Truck
+Cargo
+Current milestone
+Current speed
+Distance remaining
+ETA
+GPS status
+Shipper details
+Trip payment information
+Trip progression
+
+Milestones:
+
+Loaded
+Start Trip
+In Transit
+Approaching Destination
+Delivered
+e-POD
+
+Buttons should work.
+
+Example:
+
+[ START TRIP ]
+
+Then:
+
+[ MARK ARRIVED AT PICKUP ]
+
+Then:
+
+[ START LOADING ]
+
+Then:
+
+[ START TRIP ]
+
+Then:
+
+[ MARK ARRIVED ]
+
+Then:
+
+[ COMPLETE DELIVERY ]
+
+========================================================
+12. REAL MAP EXPERIENCE
+========================================================
+
+Use a REAL interactive map.
+
+Preferred:
+
+Leaflet + OpenStreetMap
+
+or another real map provider already available in the existing project.
+
+Do not use a fake static map image if a real map can be rendered.
+
+Show the real Chennai → Bengaluru route region.
+
+Display:
+
+- truck marker
+- route line
+- origin
+- destination
+- meaningful checkpoints
+- current position
+- remaining distance
+
+The truck position should move smoothly through the route using simulated GPS telemetry.
+
+Use requestAnimationFrame or an efficient timed update mechanism.
+
+The movement should feel continuous.
+
+Do not constantly reload the map.
+
+Do not recreate the entire map unnecessarily.
+
+========================================================
+13. SIMULATED REAL-TIME GPS
+========================================================
+
+This is still a frontend prototype, so GPS can be simulated.
+
+But the simulation must feel real.
+
+Create:
+
+- current latitude
+- current longitude
+- speed
+- heading
+- timestamp
+- distance remaining
+- progress percentage
+
+Update the simulated truck position continuously.
+
+As the truck moves:
+
+- marker moves
+- distance remaining changes
+- progress changes
+- ETA changes
+- status changes
+- trip timeline progresses
+
+The simulation must be deterministic and stable.
+
+If the browser refreshes, restore the demo state cleanly.
+
+========================================================
+14. ETA
+========================================================
+
+Show:
+
+ETA
+distance remaining
+current speed
+on-time status
+
+Example:
+
+ETA:
+6:20 PM
+
+Status:
+ON TIME
+
+Later simulate a delay:
+
+ETA:
+8:10 PM
+
+Status:
+AT RISK
+
+Use normal logistics language.
+
+Do not make it look like science fiction.
+
+========================================================
+15. EXCEPTION / INTELLIGENCE FLOW
+========================================================
+
+Create one realistic exception scenario.
+
+Example:
+
+Shipment at Risk
+
+Route:
+Chennai → Bengaluru
+
+Cause:
+Pickup detention
+
+Current ETA:
+8:10 PM
+
+Contractual target:
+6:00 PM
+
+Then show:
+
+RECOMMENDED ACTION
+
+Reassign to Truck #482
+
+Additional estimated cost:
+₹1,200
+
+Recovery ETA:
+5:48 PM
+
+Buttons:
+
+[ EXECUTE REASSIGNMENT ]
+[ KEEP CURRENT TRUCK ]
+
+When EXECUTE is clicked:
+
+- current trip status updates
+- recommendation becomes resolved
+- truck assignment changes
+- ETA changes
+- admin screen updates
+- customer screen updates
+
+This must actually work through shared frontend state.
+
+Do NOT claim this is real AI.
+It is a simulated intelligence workflow for the MVP demonstration.
+
+========================================================
+16. ADMIN / OPERATIONS EXPERIENCE
+========================================================
+
+Build an operations dashboard based on the uploaded references.
+
+Show:
+
+Active Trips
+Available Lorries
+At Risk
+Critical
+Completed
+Pending Matches
+
+Primary sections:
+
+LIVE TRIPS
+
+ACTION REQUIRED
+
+RECENT EVENTS
+
+EXCEPTIONS
+
+The admin should be able to open the active trip and see:
+
+- truck
+- driver
+- route
+- GPS
+- ETA
+- trip state
+- exception
+- recommendation
+
+========================================================
+17. EXCEPTION CENTER
+========================================================
+
+Create a polished exception screen.
+
+Example:
+
+CRITICAL SLA ALERT
+
+Trip #NL-TR-1042
+
+Chennai → Bengaluru
+
+Delay:
++2h 10m
+
+Root cause:
+Pickup detention
+
+Recommended action:
+Reassign nearby truck
+
+Recovery confidence:
+91%
+
+Buttons:
+
+[ REVIEW ]
+[ EXECUTE ]
+[ IGNORE ]
+
+Buttons must update the application state.
+
+========================================================
+18. DELIVERY / e-POD
+========================================================
+
+Use the existing e-POD UI as reference.
+
+Create a working simulated delivery flow:
+
+1. Delivery photo
+2. Cargo confirmation
+3. Receiver details
+4. Signature
+5. Timestamp
+6. GPS
+7. POD confirmation
+
+Use simulated values.
+
+Primary button:
+
+[ GENERATE e-POD & CLOSE TRIP ]
+
+After click:
+
+Trip state becomes:
+
+COMPLETED
+
+========================================================
+19. TRIP COMPLETION
+========================================================
+
+Show:
+
+TRIP COMPLETED ✓
+
+Chennai → Bengaluru
+
+Freight:
+₹32,500
+
+Fuel:
+₹11,200
+
+Toll:
+₹3,100
+
+Detention:
+₹800
+
+Estimated net:
+₹17,400
+
+Do not imply these are real accounting figures.
+They are demonstration values.
+
+========================================================
+20. RETURN LOAD RECOMMENDATION
+========================================================
+
+After trip completion, show:
+
+RECOMMENDED RETURN LOAD
+
+Bengaluru → Chennai
+
+Freight:
+₹24,500
+
+Pickup distance:
+18 km
+
+Estimated net:
+₹17,800
+
+Opportunity:
+HIGH
+
+Button:
+
+[ VIEW RETURN LOAD ]
+
+Optional:
+
+[ ACCEPT RETURN LOAD ]
+
+Clicking ACCEPT should start a new demo load/trip state.
+
+========================================================
+21. VISUAL BRAND DIRECTION
+========================================================
+
+This is extremely important.
+
+The product should NOT look like a generic AI-generated dashboard.
+
+It should feel like:
+
+A real Indian logistics company.
+
+A real lorry moving through real Indian roads.
+
+A trusted transport brand.
+
+Natural.
+Warm.
+Professional.
+Grounded.
+Human.
+Strong.
+
+Use the uploaded Namma Lorry logo as the primary brand reference.
+
+========================================================
+22. NAMMA LORRY VISUAL STORY
+========================================================
+
+The visual identity should subtly communicate:
+
+Lorry
++
+Indian Highway
++
+Movement
++
+Sunrise / sunlight
++
+Mountains
++
+Road
++
+Journey
++
+Trust
+
+Use these ideas as subtle visual language.
+
+Do NOT literally put mountains and sun everywhere.
+
+Instead:
+
+- subtle highway visual in hero/landing sections
+- subtle sunrise/sunlight accent
+- subtle mountain silhouette where appropriate
+- road-inspired dividers or background shapes
+- clean lorry imagery where helpful
+- natural Indian landscape feel
+
+The overall design should feel like:
+
+“India moves forward.”
+
+Do not make this look like a travel website.
+
+It remains a logistics product.
+
+========================================================
+23. COLOR SYSTEM
+========================================================
+
+Primary:
+Deep navy / dark blue
+
+Secondary:
+Professional warm orange / restrained saffron
+
+Supporting:
+Off-white
+Light blue-gray
+Soft green for positive states
+Soft red for critical states
+
+Avoid excessive orange.
+
+Avoid neon colors.
+
+Avoid glossy gradients.
+
+Avoid cyberpunk styling.
+
+========================================================
+24. TYPOGRAPHY
+========================================================
+
+Use highly readable modern typography.
+
+Professional.
+Strong.
+Clean.
+Excellent spacing.
+Excellent hierarchy.
+
+Avoid:
+- playful typography
+- overly futuristic fonts
+- excessive rounded typography
+- decorative fonts
+
+========================================================
+25. UI STYLE
+========================================================
+
+Use:
+
+- realistic cards
+- clean spacing
+- subtle shadows
+- clear buttons
+- professional navigation
+- useful status badges
+- restrained rounded corners
+- good information hierarchy
+
+Do not overuse cards.
+
+Do not turn every piece of text into a floating panel.
+
+The UI should feel like a serious logistics product.
+
+========================================================
+26. MOBILE FIRST
+========================================================
+
+Driver experience must be optimized for mobile.
+
+Target:
+
+390 × 844
+and
+430 × 932
+
+Make touch targets comfortable.
+
+Buttons must be easy to tap.
+
+No tiny text.
+
+No horizontal overflow.
+
+No broken layout.
+
+========================================================
+27. DESKTOP ADMIN EXPERIENCE
+========================================================
+
+Admin should also have a responsive desktop layout.
+
+Example:
+
+Left navigation
+Main operations area
+Live map
+Exceptions
+Trip details
+
+The same demo state must be visible consistently.
+
+========================================================
+28. PERFORMANCE
+========================================================
+
+Optimize heavily for smooth interaction.
+
+Targets:
+
+- smooth 60 FPS minimum on normal devices
+- support high-refresh-rate displays where the browser/device allows
+- aim for 120 FPS where technically achievable, but never fake a frame-rate claim
+- no unnecessary re-renders
+- efficient state updates
+- efficient map updates
+- lazy-load heavy components
+- avoid unnecessary animations
+- avoid huge images
+- compress assets
+- use requestAnimationFrame for animated truck movement when appropriate
+
+Do not continuously remount the map.
+
+Do not animate using expensive full-page re-renders.
+
+========================================================
+29. STABILITY / BUG PREVENTION
+========================================================
+
+Before considering the prototype complete, perform a full internal test of every workflow.
+
+Test:
+
+- navigation
+- buttons
+- role switching
+- load creation
+- matching
+- selection
+- acceptance
+- booking
+- trip state changes
+- map
+- GPS simulation
+- ETA changes
+- exception
+- reassignment
+- delivery
+- e-POD
+- trip completion
+- return-load recommendation
+- refresh persistence
+- back navigation
+- mobile layout
+- desktop layout
+
+There must be no obvious dead buttons.
+
+There must be no broken routes.
+
+There must be no console errors.
+
+There must be no missing images.
+
+There must be no invalid references.
+
+There must be no inconsistent trip state between screens.
+
+Fix issues before presenting the prototype.
+
+========================================================
+30. DATA CONSISTENCY
+========================================================
+
+All screens must use a shared demo dataset.
+
+Example:
+
+If trip status is:
+
+IN_TRANSIT
+
+then:
+
+Customer:
+IN TRANSIT
+
+Driver:
+ACTIVE TRIP
+
+Admin:
+IN TRANSIT
+
+Tracking:
+ACTIVE
+
+Timeline:
+IN TRANSIT
+
+If the driver completes delivery:
+
+all screens should update accordingly.
+
+========================================================
+31. NO FAKE CLAIMS
+========================================================
+
+This is a prototype.
+
+Do NOT display unsupported production claims such as:
+
+“15,000 verified trucks”
+“99.8% on-time”
+“100% guaranteed”
+“live AI prediction”
+“real-time 1,000+ fleet”
+“guaranteed payment”
+
+unless they are explicitly marked as SAMPLE / DEMO.
+
+Use:
+
+Sample
+Demo
+Simulated
+
+where necessary.
+
+The purpose is to show the workflow, not falsely claim real operating scale.
+
+========================================================
+32. REALISTIC LOGISTICS DETAILS
+========================================================
+
+Use realistic Indian terminology:
+
+- Lorry
+- Driver
+- Shipper
+- Pickup
+- Drop
+- Freight
+- e-POD
+- GPS
+- ETA
+- Detention
+- Return Load
+- Toll
+- FASTag
+- Trip
+- Route
+- Loading
+- Unloading
+
+Use Indian locations naturally:
+
+Chennai
+Sriperumbudur
+Krishnagiri
+Hosur
+Bengaluru
+
+Use route context such as:
+
+NH44
+
+where visually appropriate.
+
+========================================================
+33. DO NOT OVERLOAD THE MVP
+========================================================
+
+Do NOT add irrelevant features.
+
+No:
+- chatbot
+- crypto
+- blockchain
+- social feed
+- unnecessary AI assistant
+- fake futuristic command center
+- dozens of analytics charts
+- excessive enterprise features
+- unnecessary onboarding screens
+
+Every screen must support the primary logistics workflow.
+
+========================================================
+34. USE THE EXISTING ZIP INTELLIGENTLY
+========================================================
+
+Inspect the uploaded Namma Lorry ZIP before implementation.
+
+Identify reusable:
+
+- HTML
+- CSS
+- UI components
+- icons
+- images
+- existing screen designs
+- existing data structures
+- map components
+- navigation patterns
+
+Reuse good existing work instead of rebuilding everything from scratch.
+
+Where the existing code conflicts with the new MVP workflow, simplify it.
+
+Do not create unnecessary duplicate components.
+
+========================================================
+35. USE THE UPLOADED LOGO
+========================================================
+
+Use the exact uploaded Namma Lorry logo.
+
+Maintain:
+
+- correct proportions
+- correct aspect ratio
+- clean placement
+- consistent size
+- no stretching
+- no unwanted recoloring
+- no replacement
+
+Create a small favicon/app-icon treatment only if needed, while preserving the original mark.
+
+========================================================
+36. FINAL DEMO SCRIPT
+========================================================
+
+The final prototype must allow this exact demonstration:
+
+1. Open Namma Lorry
+2. Enter Shipper mode
+3. Post Chennai → Bengaluru load
+4. Click Find Lorry
+5. Show 3 matching lorries
+6. Select recommended NL-482
+7. Confirm booking
+8. Switch to Driver
+9. Receive load request
+10. Accept trip
+11. Start trip
+12. Open real map
+13. Watch simulated GPS movement
+14. Show ETA
+15. Trigger simulated delay
+16. Open Exception Center
+17. Show recommended truck reassignment
+18. Execute reassignment
+19. Return to active trip
+20. Complete delivery
+21. Capture simulated e-POD
+22. Close trip
+23. Show trip profitability
+24. Show recommended return load
+
+This must be possible without refreshing the application.
+
+========================================================
+37. DEMO MODE
+========================================================
+
+Create a clearly controlled DEMO MODE.
+
+Example:
+
+DEMO MODE
+
+Allow:
+
+- simulate GPS
+- simulate delay
+- simulate arrival
+- simulate detention
+- simulate delivery
+
+These controls should be hidden or placed in a subtle demo panel so the normal UI remains professional.
+
+========================================================
+38. ERROR HANDLING
+========================================================
+
+Handle gracefully:
+
+- invalid form
+- missing data
+- route loading failure
+- map loading failure
+- unknown state
+- invalid transition
+- missing driver
+- missing trip
+
+Never leave the user on a blank screen.
+
+Provide useful fallback UI.
+
+========================================================
+39. ACCESSIBILITY
+========================================================
+
+Use:
+
+- good contrast
+- clear labels
+- large tap targets
+- keyboard-friendly controls where applicable
+- semantic buttons
+- readable text
+
+========================================================
+40. FINAL QUALITY STANDARD
+========================================================
+
+The final result should look like it was designed by a strong professional product team for an Indian logistics startup.
+
+NOT:
+
+- generic template
+- student project
+- AI-generated dashboard
+- fake futuristic interface
+
+Instead:
+
+- believable
+- simple
+- premium
+- natural
+- trustworthy
+- Indian
+- logistics-focused
+- human
+- practical
+
+When someone sees it, they should immediately understand:
+
+“Namma Lorry connects a shipper with a lorry, follows the trip, detects problems, helps resolve them, proves delivery, and helps the truck find its next load.”
+
+========================================================
+41. FINAL SELF-CHECK BEFORE COMPLETION
+========================================================
+
+Before declaring the prototype complete:
+
+1. Run through the full demo yourself.
+2. Test every major button.
+3. Test every route.
+4. Test the complete state flow.
+5. Test mobile viewport.
+6. Test desktop viewport.
+7. Verify the map renders.
+8. Verify simulated GPS moves correctly.
+9. Verify ETA updates.
+10. Verify exception flow.
+11. Verify reassignment.
+12. Verify e-POD flow.
+13. Verify completion.
+14. Verify return-load flow.
+15. Verify no console errors.
+16. Verify no broken images.
+17. Verify no inconsistent data.
+18. Verify logo usage.
+19. Verify typography.
+20. Verify the final experience feels like one coherent product.
+
+Do not stop at generating screens.
+
+The final deliverable must be a SINGLE CONNECTED, POLISHED, INTERACTIVE NAMMA LORRY MVP PROTOTYPE.
+
+Build the prototype now.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-16T13:24:16+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\91959\Documents\Namma Lorry\Stitch UI\stitch_namma_lorry_logistics_app\index.html (LANGUAGE_HTML)
+Cursor is on line: 3
+Other open documents:
+- c:\Users\91959\Documents\Namma Lorry\Stitch UI\stitch_namma_lorry_logistics_app\index.html (LANGUAGE_HTML)
+Browser State:
+  Page CD126C9E859FDE2DF1E27C1494C3A707 (Namma Lorry — UI Reference Hub & Design System) - file:///C:/Users/91959/Documents/Namma%20Lorry/Stitch%20UI/stitch_namma_lorry_lo... [ACTIVE]
+    Viewport: 1536x730, Page Height: 729
+Running terminal commands:
+- $env:PYTHONPATH="src"
+python -m uvicorn agentsentinel.api.main:app --reload -... (in c:\Users\91959\Documents\Agent Sentinel\AgentSentinel, running for 1h21m54s)
+- npm run dev (in c:\Users\91959\Documents\Agent Sentinel\AgentSentinel\ui, running for 1h20m45s)
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from Gemini 3.8 Flash (High) to Gemini 3.1 Pro (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
