@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Namma Lorry — Driver GPS & Distance Tracking System</title>
   <meta name="description" content="Production-ready Driver GPS tracking, offline queue, noise filtering, and multi-model distance calculation system for Namma Lorry.">
+  <meta name="theme-color" content="#0b1523">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -129,6 +132,20 @@
                     <div class="location-coords" id="hudStopCoords">--</div>
                   </div>
                 </div>
+              </div>
+
+              <!-- Quick Access Drive Summary Banner -->
+              <div class="recent-summary-banner" id="recentSummaryBanner" style="display: none; margin-top: 10px; margin-bottom: 10px; background: rgba(0, 20, 40, 0.75); border: 1px solid rgba(253, 101, 30, 0.35); border-radius: var(--radius-md); padding: 10px 12px; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                  <span style="font-size: 1.1rem;">📋</span>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 0.65rem; color: var(--nl-text-muted); text-transform: uppercase;">Latest Drive Summary</div>
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="recentSummaryText">TRP-319344 • 0.0 KM</div>
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btnOpenRecentSummary" style="font-size: 0.72rem; padding: 4px 10px; flex-shrink: 0;">
+                  View Summary ➔
+                </button>
               </div>
 
               <!-- Start / End Trip Buttons -->
@@ -410,22 +427,29 @@
             <p style="font-size: 0.8rem; margin-top: 2px;">Comprehensive record of real completed trips and verification methods</p>
           </div>
 
-          <table class="nl-table">
-            <thead>
-              <tr>
-                <th>Trip ID</th>
-                <th>Corridor & Destination</th>
-                <th>Distance (KM)</th>
-                <th>Method Selected</th>
-                <th>Duration</th>
-                <th>Confidence</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="tripHistoryTableBody">
-              <!-- Dynamically rendered by app.js from real store/Supabase trips -->
-            </tbody>
-          </table>
+          <div class="table-responsive-desktop">
+            <table class="nl-table">
+              <thead>
+                <tr>
+                  <th>Trip ID</th>
+                  <th>Corridor & Destination</th>
+                  <th>Distance (KM)</th>
+                  <th>Method Selected</th>
+                  <th>Duration</th>
+                  <th>Confidence</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="tripHistoryTableBody">
+                <!-- Dynamically rendered by app.js from real store/Supabase trips -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Cards Container (Visible on Phone Screens) -->
+          <div class="mobile-trips-container" id="mobileTripsContainer">
+            <!-- Dynamically rendered mobile cards -->
+          </div>
         </div>
       </section>
 
@@ -559,6 +583,26 @@
       </section>
 
     </main>
+
+    <!-- Mobile Bottom Navigation Bar (Section 3 & Touch Ergonomics) -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
+      <button class="mobile-nav-item active" data-view="view-cockpit">
+        <span class="mobile-nav-icon">📱</span>
+        <span class="mobile-nav-label">Cockpit</span>
+      </button>
+      <button class="mobile-nav-item" data-view="view-analytics">
+        <span class="mobile-nav-icon">📊</span>
+        <span class="mobile-nav-label">Analytics</span>
+      </button>
+      <button class="mobile-nav-item" data-view="view-fleet">
+        <span class="mobile-nav-icon">🚛</span>
+        <span class="mobile-nav-label">Fleet</span>
+      </button>
+      <button class="mobile-nav-item" data-view="view-lab">
+        <span class="mobile-nav-icon">🧪</span>
+        <span class="mobile-nav-label">Lab</span>
+      </button>
+    </nav>
 
     <!-- ============================================================
          MODAL: TRIP COMPLETED & MULTI-MODEL AUDIT SUMMARY (Section 23)

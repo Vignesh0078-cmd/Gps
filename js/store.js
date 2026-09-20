@@ -106,12 +106,6 @@ class Store {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.trips) {
-          parsed.trips = parsed.trips.filter(t => 
-            t.calculationMethod !== 'Model A (Known Corridor)' &&
-            !(t.origin && t.origin.includes('Chennai Port Container Terminal'))
-          );
-        }
         return { ...SEED_DATA, ...parsed };
       }
     } catch (e) {
@@ -198,43 +192,87 @@ class Store {
 
   // Trips
   getTrips() {
-    return this.data.trips;
+    return this.data.trips || [];
+  }
+
+  getLatestTrip() {
+    return (this.data.trips && this.data.trips.length > 0) ? this.data.trips[0] : null;
   }
 
   addTrip(trip) {
+    if (!this.data.trips) this.data.trips = [];
+    // Ensure no duplicate by id
+    this.data.trips = this.data.trips.filter(t => t.id !== trip.id);
     this.data.trips.unshift(trip);
-    // Update weekly & monthly stats
-    const todayDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
-    if (this.data.weeklyHistoryKm[todayDay] !== undefined) {
-      this.data.weeklyHistoryKm[todayDay] = parseFloat((this.data.weeklyHistoryKm[todayDay] + trip.distanceKm).toFixed(1));
-    }
-    const driver = this.getActiveDriver();
-    if (driver) {
-      driver.totalKm = parseFloat((driver.totalKm + trip.distanceKm).toFixed(1));
-      driver.tripsCompleted += 1;
-    }
+    this.recalculateDriverStats();
     this.save();
+  }
+
+  setTrips(trips) {
+    if (!Array.isArray(trips)) return;
+    // Sort descending by startedAt
+    const sorted = [...trips].sort((a, b) => {
+      const ta = new Date(a.startedAt || a.started_at || a.created_at || 0).getTime();
+      const tb = new Date(b.startedAt || b.started_at || b.created_at || 0).getTime();
+      return tb - ta;
+    });
+    this.data.trips = sorted;
+    this.recalculateDriverStats();
+    this.save();
+  }
+
+  recalculateDriverStats() {
+    const activeDriver = this.getActiveDriver();
+    if (!activeDriver) return;
+
+    const trips = this.data.trips || [];
+    const driverTrips = trips.filter(t => (t.driverId === activeDriver.id || t.driver_id === activeDriver.id));
+
+    // Reset weekly breakdown
+    const weekly = { Mon: 0.0, Tue: 0.0, Wed: 0.0, Thu: 0.0, Fri: 0.0, Sat: 0.0, Sun: 0.0 };
+    const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    let totalKm = 0;
+    driverTrips.forEach(t => {
+      const dist = parseFloat(t.distanceKm !== undefined ? t.distanceKm : (t.distance_km || 0));
+      totalKm += dist;
+
+      const dateStr = t.endedAt || t.startedAt || t.ended_at || t.started_at || t.created_at;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const dayName = daysMap[d.getDay()];
+          if (weekly[dayName] !== undefined) {
+            weekly[dayName] = parseFloat((weekly[dayName] + dist).toFixed(1));
+          }
+        }
+      }
+    });
+
+    this.data.weeklyHistoryKm = weekly;
+    activeDriver.totalKm = parseFloat(totalKm.toFixed(1));
+    activeDriver.tripsCompleted = driverTrips.length;
   }
 
   // Summary Metrics — 100% Real Data
   getDriverStats(driverId) {
     const targetId = driverId || this.data.activeDriverId;
     const trips = (this.data.trips || []).filter(t => {
-      if (t.driverId !== targetId || t.status !== 'completed') return false;
-      // Filter out legacy simulation corridor runs
-      if (t.calculationMethod === 'Model A (Known Corridor)') return false;
-      if (t.origin && t.origin.includes('Chennai Port Container Terminal')) return false;
-      return true;
+      const dId = t.driverId || t.driver_id;
+      return dId === targetId && (t.status === 'completed' || !t.status);
     });
     
     // Today calculation
     const today = new Date().toISOString().slice(0, 10);
-    const todayTrips = trips.filter(t => (t.endedAt || t.startedAt || '').slice(0, 10) === today);
-    const todayKm = todayTrips.reduce((sum, t) => sum + (t.distanceKm || 0), 0);
+    const todayTrips = trips.filter(t => {
+      const dt = (t.endedAt || t.startedAt || t.ended_at || t.started_at || t.created_at || '').slice(0, 10);
+      return dt === today;
+    });
+
+    const todayKm = todayTrips.reduce((sum, t) => sum + parseFloat(t.distanceKm !== undefined ? t.distanceKm : (t.distance_km || 0)), 0);
     const todayDurationMins = todayTrips.reduce((sum, t) => sum + (t.durationMinutes || 0), 0);
 
-    const weeklyTotalKm = trips.reduce((sum, t) => sum + (t.distanceKm || 0), 0);
-    const driver = this.data.drivers.find(d => d.id === targetId);
+    const weeklyTotalKm = trips.reduce((sum, t) => sum + parseFloat(t.distanceKm !== undefined ? t.distanceKm : (t.distance_km || 0)), 0);
 
     return {
       todayKm: parseFloat(todayKm.toFixed(1)),
@@ -242,7 +280,7 @@ class Store {
       todayDrivingHours: (todayDurationMins / 60).toFixed(1) + 'h',
       weeklyTotalKm: parseFloat(weeklyTotalKm.toFixed(1)),
       monthlyTotalKm: parseFloat(weeklyTotalKm.toFixed(1)),
-      weeklyBreakdown: this.data.weeklyHistoryKm,
+      weeklyBreakdown: this.data.weeklyHistoryKm || {},
       allTrips: trips
     };
   }
