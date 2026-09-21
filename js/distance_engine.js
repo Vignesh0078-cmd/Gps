@@ -126,8 +126,16 @@ class DistanceEngine {
    * MODEL C — OpenStreetMap + OSRM Road-Network Routing
    * Queries public OSRM engine or performs smart road corridor matching
    */
-  async calculateModelC(cleanedPoints, isOnline) {
-    if (!cleanedPoints || cleanedPoints.length < 2) {
+  /**
+   * MODEL C — OpenStreetMap + OSRM Road-Network Routing
+   * Queries public OSRM engine or performs smart road corridor matching.
+   * Direct Start-to-End road routing prevents intermediate waypoint U-turn anomalies.
+   */
+  async calculateModelC(cleanedPoints, isOnline, startPoint, endPoint) {
+    const pStart = startPoint || (cleanedPoints && cleanedPoints[0]);
+    const pEnd = endPoint || (cleanedPoints && cleanedPoints[cleanedPoints.length - 1]);
+
+    if (!pStart || !pEnd) {
       return {
         method: 'Model C (OSRM Road Snapping)',
         distanceKm: null,
@@ -146,23 +154,15 @@ class DistanceEngine {
       };
     }
 
-    // Sample key waypoints (OSRM URL max length constraints: sample up to 25 points evenly)
-    const sampled = [];
-    const step = Math.max(1, Math.floor(cleanedPoints.length / 20));
-    for (let i = 0; i < cleanedPoints.length; i += step) {
-      sampled.push(cleanedPoints[i]);
-    }
-    // Ensure exact destination is always included
-    if (sampled[sampled.length - 1] !== cleanedPoints[cleanedPoints.length - 1]) {
-      sampled.push(cleanedPoints[cleanedPoints.length - 1]);
-    }
-
-    const coordStr = sampled.map(p => `${p.longitude.toFixed(5)},${p.latitude.toFixed(5)}`).join(';');
+    // Direct Origin-to-Destination Road Routing:
+    // Querying the true start and destination coordinates prevents noisy intermediate points
+    // from forcing multi-kilometer U-turns across divided highways and medians.
+    const coordStr = `${pStart.longitude.toFixed(5)},${pStart.latitude.toFixed(5)};${pEnd.longitude.toFixed(5)},${pEnd.latitude.toFixed(5)}`;
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 sec timeout
+      const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5 sec timeout
 
       const res = await fetch(osrmUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -181,16 +181,16 @@ class DistanceEngine {
           available: true,
           confidence: 'Very High (OSM Road Snapped)',
           geometry: geometry,
-          note: `Snaped to actual highway network via OpenStreetMap OSRM routing`
+          note: `Snapped to actual road network via OpenStreetMap OSRM routing`
         };
       }
     } catch (err) {
       console.warn('OSRM request fallback (network/timeout):', err.message);
     }
 
-    // Fallback road estimate: GPS Haversine + 1.03 (slight micro-curve road factor)
-    const modelB = this.calculateModelB(cleanedPoints);
-    const estimatedRoadKm = parseFloat((modelB.distanceKm * 1.025).toFixed(1));
+    // Fallback road estimate if network fails: straight line * 1.25 winding factor
+    const directKm = this.haversineKm(pStart.latitude, pStart.longitude, pEnd.latitude, pEnd.longitude);
+    const estimatedRoadKm = parseFloat((directKm * 1.25).toFixed(1));
 
     return {
       method: 'Model C (OSM Road Engine)',
@@ -203,102 +203,135 @@ class DistanceEngine {
 
   /**
    * Final Model Selection & Quality Arbiter
-   * Evaluates Section 20 decision tree:
-   * 1. Check GPS availability and quality score
-   * 2. Compare Model B (GPS) and Model C (OSRM Road)
-   * 3. Fallback safely to Model A if needed
+   * Evaluates Section 20 decision tree with Physical Validation & Outlier Rejection:
+   * 1. Calculate straight-line displacement D between START and STOP.
+   * 2. Validate GPS (Model B): Must not be significantly smaller than D.
+   * 3. Validate OSRM (Model C): Must be close to D and reject extreme outliers.
+   * 4. Compare remaining valid models and select verified distance.
    */
   async resolveFinalDistance({
-    cleanedPoints,
-    rawPointsCount,
-    origin,
-    destination,
+    cleanedPoints = [],
+    rawPointsCount = 0,
+    origin = '',
+    destination = '',
     isOnline = true,
-    isDeviceTrip = false
+    isDeviceTrip = false,
+    startPoint = null,
+    endPoint = null
   }) {
-    const modelA = this.calculateModelA(
-      origin,
-      destination,
-      cleanedPoints[0],
-      cleanedPoints[cleanedPoints.length - 1],
-      isDeviceTrip
-    );
+    const pStart = startPoint || (cleanedPoints && cleanedPoints[0]);
+    const pEnd = endPoint || (cleanedPoints && cleanedPoints[cleanedPoints.length - 1]);
 
+    const displacementKm = (pStart && pEnd)
+      ? this.haversineKm(pStart.latitude, pStart.longitude, pEnd.latitude, pEnd.longitude)
+      : 0.0;
+
+    const modelA = this.calculateModelA(origin, destination, pStart, pEnd, isDeviceTrip);
     const modelB = this.calculateModelB(cleanedPoints);
-    const modelC = await this.calculateModelC(cleanedPoints, isOnline);
+    const modelC = await this.calculateModelC(cleanedPoints, isOnline, pStart, pEnd);
 
-    const qualityRatio = rawPointsCount > 0 ? (cleanedPoints.length / rawPointsCount) : 0;
-
-    // Decision Logic:
     let selectedModel = null;
     let rationale = '';
     let confidenceScore = 'High';
 
-    if (isDeviceTrip && (cleanedPoints.length < 2 || modelB.distanceKm < 0.05)) {
-      // Driver started and stopped at the same spot (stationary / minimal movement)
+    // 1. Stationary Vehicle Check:
+    // If vehicle started and stopped at the same spot (< 60m displacement, < 80m GPS), record 0.0 KM
+    if (isDeviceTrip && displacementKm < 0.06 && (modelB.distanceKm < 0.08 || !modelB.valid)) {
       selectedModel = {
         modelCode: 'MODEL_B',
-        name: 'Model B (GPS Filtered)',
+        name: 'Model B (GPS Stationary)',
         distanceKm: 0.0,
         confidence: 'Verified (Zero Movement)',
         reason: 'Trip started and stopped at the same location. Zero mileage recorded.'
       };
       confidenceScore = 'Verified (0.0 KM)';
       rationale = 'Device GPS confirmed stationary vehicle. Start and stopping points match.';
-    } else if (cleanedPoints.length < 2 || qualityRatio < 0.25) {
-      // Degraded GPS -> Fallback to Model A (for device trip: straight line * 1.25 between start and stop)
-      selectedModel = {
-        modelCode: 'MODEL_A',
-        name: modelA.method,
-        distanceKm: modelA.distanceKm,
-        confidence: 'Low / Emergency Fallback',
-        reason: isDeviceTrip
-          ? 'Limited GPS points collected. Distance estimated via start-to-stop geodesic highway factor.'
-          : 'GPS signal was absent or severely corrupted. Relying on verified route baseline.'
+      return {
+        selectedModel,
+        finalDistanceKm: 0.0,
+        confidenceScore,
+        rationale,
+        breakdown: { modelA, modelB, modelC }
       };
-      confidenceScore = 'Low (Fallback)';
-      rationale = isDeviceTrip
-        ? 'Sparse GPS fixes. Estimated via start/stop vector × 1.25 winding factor.'
-        : 'GPS data degraded (<25% valid points). Emergency Model A selected.';
-    } else if (modelC.available && modelC.distanceKm !== null) {
-      // Model C available -> Check difference with Model B
-      const diffKm = Math.abs(modelC.distanceKm - modelB.distanceKm);
-      const diffPct = modelB.distanceKm > 0 ? (diffKm / modelB.distanceKm) * 100 : 0;
+    }
 
-      if (diffPct <= 15.0) {
-        // High agreement between GPS points and OSM Road network
+    // 2. Validate GPS Model B:
+    // Physical Law: Actual travel path length cannot be significantly smaller than straight-line displacement.
+    // If GPS distance is smaller than 85% of straight-line displacement, GPS dropped points or started late.
+    const gpsValid = modelB.valid &&
+                     (modelB.distanceKm >= Math.max(0.05, displacementKm * 0.85)) &&
+                     (modelB.distanceKm <= Math.max(displacementKm * 3.5, displacementKm + 10.0));
+
+    // 3. Validate OSRM Model C:
+    // Road distance must be >= straight-line displacement and must NOT be an absurd outlier (e.g. 38.6 km for 1.5 km trip)
+    const osrmValid = modelC.available &&
+                      (modelC.distanceKm !== null && !isNaN(modelC.distanceKm)) &&
+                      (modelC.distanceKm >= displacementKm * 0.85) &&
+                      (modelC.distanceKm <= Math.max(displacementKm * 2.8, displacementKm + 5.0));
+
+    // 4. Decision Selection Tree
+    if (gpsValid && osrmValid) {
+      // Both GPS and Road Network are physically valid.
+      // Compare variance:
+      const diffKm = Math.abs(modelC.distanceKm - modelB.distanceKm);
+      const diffRatio = diffKm / Math.min(modelB.distanceKm, modelC.distanceKm);
+
+      if (diffRatio <= 0.25) {
+        // High agreement (<= 25% difference): Model C gives the exact road-snapped precision
         selectedModel = {
           modelCode: 'MODEL_C',
           name: 'Model C (GPS + OSRM Road)',
           distanceKm: modelC.distanceKm,
-          confidence: 'High (99.4%)',
-          reason: `GPS trace aligned with OpenStreetMap highway geometry (${diffPct.toFixed(1)}% variance).`
+          confidence: 'High (Verified Road Match)',
+          reason: `GPS trace and OpenStreetMap road network agree closely (${modelC.distanceKm} km vs ${modelB.distanceKm} km).`
         };
-        confidenceScore = 'High (99.4%)';
-        rationale = 'Road-snapped OpenStreetMap distance matches recorded GPS within 15%. Model C selected.';
+        confidenceScore = 'High (Verified Road Match)';
+        rationale = `OpenStreetMap road routing matches GPS trajectory within ${(diffRatio * 100).toFixed(1)}%. Model C selected.`;
       } else {
-        // Divergence: driver might have taken an off-highway shortcut or alternative path
+        // Both valid, but driver took a specific alternate local route
         selectedModel = {
           modelCode: 'MODEL_B',
           name: 'Model B (GPS Filtered Haversine)',
           distanceKm: modelB.distanceKm,
-          confidence: 'Medium-High',
-          reason: `Trajectory diverged from standard OSM highway by ${diffPct.toFixed(1)}%. Real GPS retained.`
+          confidence: 'High (Driver Trajectory)',
+          reason: `Driver trajectory (${modelB.distanceKm} km) validated against straight-line displacement (${displacementKm.toFixed(1)} km).`
         };
-        confidenceScore = 'Medium-High';
-        rationale = 'Significant divergence from standard highway model. Using actual driver GPS track.';
+        confidenceScore = 'High (GPS Verified)';
+        rationale = `Driver followed a specific path verified by continuous GPS fixes. Model B selected.`;
       }
-    } else {
-      // Offline mode or OSRM unavailable -> Model B is primary
+    } else if (osrmValid) {
+      // GPS was incomplete, dropped points, or started late (e.g. Kosapet -> Konavattam)
+      selectedModel = {
+        modelCode: 'MODEL_C',
+        name: 'Model C (OSRM Road Network)',
+        distanceKm: modelC.distanceKm,
+        confidence: 'High (Road Verified)',
+        reason: `GPS trace was incomplete (${modelB.distanceKm} km < straight-line displacement ${displacementKm.toFixed(1)} km). Validated OpenStreetMap road distance selected.`
+      };
+      confidenceScore = 'High (Road Verified)';
+      rationale = `GPS distance (${modelB.distanceKm} km) was physically incomplete for start-to-stop displacement (${displacementKm.toFixed(1)} km). Validated road distance (Model C) selected.`;
+    } else if (gpsValid) {
+      // OSRM routing was an absurd outlier or offline (e.g. Konavattam -> Sathuvachari)
       selectedModel = {
         modelCode: 'MODEL_B',
         name: 'Model B (GPS Filtered Haversine)',
         distanceKm: modelB.distanceKm,
-        confidence: 'High (Offline Verified)',
-        reason: 'Calculated from valid GPS points during offline operation.'
+        confidence: 'High (GPS Verified)',
+        reason: `OSRM routing returned an outlier or was unavailable. Validated driver GPS distance selected.`
       };
-      confidenceScore = 'High (Offline Verified)';
-      rationale = 'System operated offline. GPS Haversine distance selected.';
+      confidenceScore = 'High (GPS Verified)';
+      rationale = `OSRM query returned an outlier or was offline. Filtered driver GPS (Model B) selected.`;
+    } else {
+      // Both failed: Fallback to Model A (standard highway winding factor)
+      selectedModel = {
+        modelCode: 'MODEL_A',
+        name: modelA.method,
+        distanceKm: modelA.distanceKm,
+        confidence: 'Medium (Estimated Highway Factor)',
+        reason: `GPS trace and road routing queries were inconclusive. Selected standard highway factor fallback.`
+      };
+      confidenceScore = 'Medium (Fallback)';
+      rationale = `Sparse GPS fixes and road query inconclusive. Selected start-to-stop geodesic × 1.25 highway factor.`;
     }
 
     return {

@@ -321,7 +321,9 @@ class GPSTracker {
       origin,
       destination,
       isOnline,
-      isDeviceTrip: (this.trackingMode === 'device')
+      isDeviceTrip: (this.trackingMode === 'device'),
+      startPoint: this.startPoint,
+      endPoint: this.endPoint
     });
 
     const activeDriver = this.store.getActiveDriver();
