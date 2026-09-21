@@ -16,6 +16,15 @@ class TestRunner {
     this.store = store;
     this.logs = [];
     this.logListener = null;
+    this.statusListeners = [];
+  }
+
+  onStatusChange(listener) {
+    this.statusListeners.push(listener);
+  }
+
+  notifyStatus(testNum, status, details = '') {
+    this.statusListeners.forEach(fn => fn({ testNum, status, details }));
   }
 
   setLogListener(listener) {
@@ -72,6 +81,7 @@ class TestRunner {
    * Verifies: GPS point capture, local distance calculation, OSRM road matching, immediate sync
    */
   async runTest1() {
+    this.notifyStatus(1, 'running', 'Validating Online GPS & OSRM...');
     this.log('[TEST 1] Testing Online Operation (Internet ON)...', 'info');
     this.store.setOnlineStatus(true);
 
@@ -92,6 +102,7 @@ class TestRunner {
 
     const passed = validation.isValid && ptRecord.sync_status === 'synced' && distModelB.distanceKm > 0;
     this.log(`✅ TEST 1 RESULT: ${passed ? 'PASSED' : 'FAILED'}`, passed ? 'success' : 'error');
+    this.notifyStatus(1, passed ? 'passed' : 'failed', passed ? `${distModelB.distanceKm} KM Synced` : 'Failed');
     return { name: 'Test 1: Internet ON', passed };
   }
 
@@ -100,6 +111,7 @@ class TestRunner {
    * Verifies: GPS recording continues, points saved to local offline queue with sync_status: pending
    */
   async runTest2() {
+    this.notifyStatus(2, 'running', 'Verifying local queue persistence...');
     this.log('[TEST 2] Testing Offline Queueing (Internet OFF)...', 'info');
     this.store.setOnlineStatus(false);
     this.store.clearOfflineQueue();
@@ -120,6 +132,7 @@ class TestRunner {
 
     const passed = queue.length === 3 && queue.every(p => p.sync_status === 'pending');
     this.log(`✅ TEST 2 RESULT: ${passed ? 'PASSED' : 'FAILED'}`, passed ? 'success' : 'error');
+    this.notifyStatus(2, passed ? 'passed' : 'failed', passed ? '3 Points Queued (Pending)' : 'Failed');
     return { name: 'Test 2: Internet OFF', passed };
   }
 
@@ -128,6 +141,7 @@ class TestRunner {
    * Verifies: Pending points sync to server, queue cleared, zero duplicate records
    */
   async runTest3() {
+    this.notifyStatus(3, 'running', 'Testing reconnect & zero duplicates...');
     this.log('[TEST 3] Testing Reconnection & Deduplication (OFF ➔ ON)...', 'info');
 
     // Ensure we have pending points to test (create 3 if queue empty)
@@ -166,6 +180,7 @@ class TestRunner {
 
     const passed = Boolean(syncResult && syncResult.success && queueAfter.length === 0 && syncedCount === queueBefore.length);
     this.log(`TEST 3 RESULT: ${passed ? 'PASSED' : 'FAILED'}`, passed ? 'success' : 'error');
+    this.notifyStatus(3, passed ? 'passed' : 'failed', passed ? '100% Synced (0 Duplicates)' : 'Failed');
     return { name: 'Test 3: Reconnection Sync', passed };
   }
 
@@ -174,6 +189,7 @@ class TestRunner {
    * Verifies: Check 1 (Accuracy > 50m rejected) & Check 2 (Speed > 120 km/h jump rejected)
    */
   async runTest4() {
+    this.notifyStatus(4, 'running', 'Evaluating Check 1 & Check 2...');
     this.log('[TEST 4] Testing GPS Quality Check & Jump Rejection...', 'info');
 
     const normalP1 = { id: 'T4-1', latitude: 12.9716, longitude: 77.5946, accuracy: 7.0, speed: 45, recorded_at: new Date().toISOString() };
@@ -197,6 +213,7 @@ class TestRunner {
 
     const passed = !valA.isValid && !valB.isValid;
     this.log(`✅ TEST 4 RESULT: ${passed ? 'PASSED (All anomalies filtered)' : 'FAILED'}`, passed ? 'success' : 'error');
+    this.notifyStatus(4, passed ? 'passed' : 'failed', passed ? 'Spikes Blocked (Checks 1 & 2)' : 'Failed');
     return { name: 'Test 4: GPS Jump Simulation', passed };
   }
 
@@ -205,6 +222,7 @@ class TestRunner {
    * Verifies Section 10: Dynamically adjusts interval based on vehicle speed
    */
   async runTest5() {
+    this.notifyStatus(5, 'running', 'Validating adaptive capture intervals...');
     this.log('[TEST 5] Testing Dynamic Capture Interval & Battery Optimization...', 'info');
 
     const speeds = [
@@ -224,6 +242,7 @@ class TestRunner {
 
     const passed = allCorrect;
     this.log(`✅ TEST 5 RESULT: ${passed ? 'PASSED' : 'FAILED'}`, passed ? 'success' : 'error');
+    this.notifyStatus(5, passed ? 'passed' : 'failed', passed ? 'Adaptive Rates (5s/10s/30s)' : 'Failed');
     return { name: 'Test 5: Battery & Interval', passed };
   }
 }

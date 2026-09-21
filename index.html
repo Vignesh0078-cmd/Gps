@@ -466,89 +466,206 @@
       </section>
 
       <!-- ============================================================
-           VIEW 4: ALGORITHM TESTING LAB (Section 31 Testing Plan)
+           VIEW 4: ALGORITHM LAB & SPECIFICATION TEST SUITE (Section 31)
            ============================================================ -->
       <section class="view-section" id="view-lab">
-        <div class="test-suite-layout">
+        <div class="lab-main-layout">
 
-          <!-- Left: Test Cases List -->
-          <div class="test-cases-panel">
-            <div class="card" style="margin-bottom: 8px;">
-              <h3>Specification Test Suite</h3>
-              <p style="font-size: 0.8rem; margin-top: 4px;">
-                Automated tests defined in <strong>Section 31</strong> of <code>gps.docx</code>.
-              </p>
-              <div style="margin-top: 14px; display: flex; gap: 8px;">
-                <button class="btn btn-primary btn-sm" id="btnRunAllTests">
-                  <span>⚡</span> Run All Section 31 Tests
+          <!-- Interactive Freight Corridor Simulator Workbench -->
+          <div class="lab-simulator-card card">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-accent">LAB BENCHMARK</span>
+                  <span class="badge badge-success" id="labSimStatusBadge">IDLE / READY</span>
+                </div>
+                <h3 style="margin-top: 4px;">Freight Corridor Simulation &amp; Filter Lab</h3>
+                <p style="font-size: 0.8rem; color: var(--nl-text-muted); margin-top: 2px;">
+                  Simulate Tamil Nadu freight corridors in real time without vehicle movement. Validates Kalman filter, speed deadbands, and spike rejection.
+                </p>
+              </div>
+
+              <!-- Route Corridor Picker -->
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 0.78rem; color: var(--nl-text-muted); font-weight: 600;">CORRIDOR:</label>
+                <select id="labCorridorSelect" class="form-control" style="font-size: 0.82rem; padding: 6px 12px; background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); color: #ffffff; border-radius: var(--radius-sm);">
+                  <option value="chennai_sriperumbudur">Chennai Port ➔ Sriperumbudur (42 km)</option>
+                  <option value="chennai_vellore">Chennai Port ➔ Vellore (138 km)</option>
+                  <option value="chennai_bengaluru">Chennai Port ➔ Bengaluru (348 km)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Simulator Control Toolbar -->
+            <div class="lab-control-toolbar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--nl-surface-dim); padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 14px; border: 1px solid var(--nl-surface-card-border);">
+              <!-- Playback Buttons -->
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm" id="btnLabStartSim">
+                  <span>▶</span> Start Simulation
                 </button>
-                <button class="btn btn-secondary btn-sm" id="btnClearLogs">
-                  Clear Log
+                <button class="btn btn-secondary btn-sm" id="btnLabPauseSim">
+                  <span>⏸</span> Pause
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btnLabResetSim">
+                  <span>⏹</span> Reset
+                </button>
+              </div>
+
+              <!-- Speed Multiplier Pills -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 0.75rem; color: var(--nl-text-muted); font-weight: 600;">SPEED:</span>
+                <div class="speed-selector" id="labSpeedSelector">
+                  <button class="speed-pill lab-speed-pill" data-speed="1">1x</button>
+                  <button class="speed-pill lab-speed-pill" data-speed="2">2x</button>
+                  <button class="speed-pill lab-speed-pill active" data-speed="5">5x</button>
+                  <button class="speed-pill lab-speed-pill" data-speed="10">10x</button>
+                  <button class="speed-pill lab-speed-pill" data-speed="20">20x</button>
+                </div>
+              </div>
+
+              <!-- Interactive Anomaly Injection Buttons -->
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-danger btn-sm" id="btnLabInjectJump" title="Inject an impossible speed leap (>180 km/h) to verify Check 2 spike rejection">
+                  <span>⚡</span> Inject 180 km/h Jump
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btnLabInjectBadAccuracy" title="Inject degraded satellite fix (±88m) to verify Check 1 threshold">
+                  <span>📡</span> Degraded GPS (88m)
                 </button>
               </div>
             </div>
 
-            <!-- Test Case 1 -->
-            <div class="test-case-item">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="font-size: 0.9rem;">Test 1: Internet ON</h4>
-                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="1">Run</button>
+            <!-- Live Algorithm Telemetry Grid (4 Cards) -->
+            <div class="lab-telemetry-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;">
+              <div class="telemetry-pill">
+                <div class="telemetry-pill-label">CURRENT SPEED &amp; INTERVAL</div>
+                <div class="telemetry-pill-value" id="labTelemetrySpeed" style="color: var(--nl-accent);">0.0 <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM/H</span></div>
+                <div style="font-size: 0.7rem; color: var(--nl-text-secondary); margin-top: 2px;" id="labTelemetryInterval">Interval: 30s (Stationary)</div>
               </div>
-              <p style="font-size: 0.75rem; margin-top: 6px;">
-                Validates real-time GPS point capture, Haversine accumulation, OSRM road match, and direct Supabase sync.
-              </p>
+
+              <div class="telemetry-pill">
+                <div class="telemetry-pill-label">MODEL A (CORRIDOR BASELINE)</div>
+                <div class="telemetry-pill-value" id="labTelemetryModelA">42.0 <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM</span></div>
+                <div style="font-size: 0.7rem; color: var(--nl-text-secondary); margin-top: 2px;">Known Freight Route</div>
+              </div>
+
+              <div class="telemetry-pill">
+                <div class="telemetry-pill-label">MODEL B (ACCUMULATED HAVERSINE)</div>
+                <div class="telemetry-pill-value" id="labTelemetryModelB" style="color: var(--nl-success);">0.0 <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM</span></div>
+                <div style="font-size: 0.7rem; color: var(--nl-text-secondary); margin-top: 2px;">Filtered GPS Geodesic</div>
+              </div>
+
+              <div class="telemetry-pill">
+                <div class="telemetry-pill-label">GPS FILTER INTEGRITY</div>
+                <div class="telemetry-pill-value" id="labTelemetryFilterRatio" style="font-size: 1.1rem; color: #ffffff;">0 <span style="font-size: 0.75rem; color: var(--nl-success);">OK</span> / 0 <span style="font-size: 0.75rem; color: var(--nl-error);">FLTR</span></div>
+                <div style="font-size: 0.7rem; color: var(--nl-text-secondary); margin-top: 2px;" id="labTelemetryWaypoint">Waypoint: Idle (0/16)</div>
+              </div>
             </div>
 
-            <!-- Test Case 2 -->
-            <div class="test-case-item">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="font-size: 0.9rem;">Test 2: Internet OFF</h4>
-                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="2">Run</button>
-              </div>
-              <p style="font-size: 0.75rem; margin-top: 6px;">
-                Simulates internet disconnection. Verifies GPS recording continues locally in queue with <code>pending</code> status.
-              </p>
-            </div>
-
-            <!-- Test Case 3 -->
-            <div class="test-case-item">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="font-size: 0.9rem;">Test 3: Internet OFF ➔ ON</h4>
-                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="3">Run</button>
-              </div>
-              <p style="font-size: 0.75rem; margin-top: 6px;">
-                Simulates reconnection. Verifies all queued points batch-sync with zero duplication.
-              </p>
-            </div>
-
-            <!-- Test Case 4 -->
-            <div class="test-case-item">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="font-size: 0.9rem;">Test 4: GPS Jump Simulation</h4>
-                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="4">Run</button>
-              </div>
-              <p style="font-size: 0.75rem; margin-top: 6px;">
-                Injects poor accuracy (85m) and impossible leap point. Verifies rejection by Filter Checks 1 and 2.
-              </p>
-            </div>
-
-            <!-- Test Case 5 -->
-            <div class="test-case-item">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h4 style="font-size: 0.9rem;">Test 5: Dynamic Interval & Battery</h4>
-                <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="5">Run</button>
-              </div>
-              <p style="font-size: 0.75rem; margin-top: 6px;">
-                Validates dynamic adjustment of GPS capture interval based on vehicle speed to prevent phone battery drain.
-              </p>
-            </div>
+            <!-- Dedicated Leaflet Lab Map Container -->
+            <div id="labMap" style="width: 100%; height: 360px; border-radius: var(--radius-md); border: 1px solid var(--nl-surface-card-border); background: #0b1523; position: relative;"></div>
           </div>
 
-          <!-- Right: Diagnostic Console Log Output -->
-          <div class="test-log-console" id="testConsole">
-            <div class="log-entry log-info">[SYSTEM READY] Namma Lorry Algorithm Lab initialized. Select a test or run all to view live diagnostic logs.</div>
-          </div>
+          <!-- Bottom: Specification Test Suite & Diagnostic Console Layout -->
+          <div class="test-suite-layout" style="margin-top: 18px;">
 
+            <!-- Left: Test Cases List -->
+            <div class="test-cases-panel">
+              <div class="card" style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <h3>Specification Test Suite</h3>
+                    <p style="font-size: 0.8rem; margin-top: 2px;">
+                      Automated tests defined in <strong>Section 31</strong> of <code>gps.docx</code>.
+                    </p>
+                  </div>
+                </div>
+                <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button class="btn btn-primary btn-sm" id="btnRunAllTests">
+                    <span>⚡</span> Run All Section 31 Tests
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="btnClearLogs">
+                    Clear Log
+                  </button>
+                </div>
+              </div>
+
+              <!-- Test Case 1 -->
+              <div class="test-case-item" id="testCard1">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.9rem;">Test 1: Internet ON</h4>
+                    <span class="badge badge-ready" id="badgeTest1">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="1">Run</button>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 6px;">
+                  Validates real-time GPS point capture, Haversine accumulation, OSRM road match, and direct Supabase sync.
+                </p>
+              </div>
+
+              <!-- Test Case 2 -->
+              <div class="test-case-item" id="testCard2">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.9rem;">Test 2: Internet OFF</h4>
+                    <span class="badge badge-ready" id="badgeTest2">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="2">Run</button>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 6px;">
+                  Simulates internet disconnection. Verifies GPS recording continues locally in queue with <code>pending</code> status.
+                </p>
+              </div>
+
+              <!-- Test Case 3 -->
+              <div class="test-case-item" id="testCard3">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.9rem;">Test 3: Internet OFF ➔ ON</h4>
+                    <span class="badge badge-ready" id="badgeTest3">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="3">Run</button>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 6px;">
+                  Simulates reconnection. Verifies all queued points batch-sync with zero duplication.
+                </p>
+              </div>
+
+              <!-- Test Case 4 -->
+              <div class="test-case-item" id="testCard4">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.9rem;">Test 4: GPS Jump Simulation</h4>
+                    <span class="badge badge-ready" id="badgeTest4">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="4">Run</button>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 6px;">
+                  Injects poor accuracy (85m) and impossible leap point. Verifies rejection by Filter Checks 1 and 2.
+                </p>
+              </div>
+
+              <!-- Test Case 5 -->
+              <div class="test-case-item" id="testCard5">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.9rem;">Test 5: Dynamic Interval &amp; Battery</h4>
+                    <span class="badge badge-ready" id="badgeTest5">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="5">Run</button>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 6px;">
+                  Validates dynamic adjustment of GPS capture interval based on vehicle speed to prevent phone battery drain.
+                </p>
+              </div>
+            </div>
+
+            <!-- Right: Diagnostic Console Log Output -->
+            <div class="test-log-console" id="testConsole">
+              <div class="log-entry log-info">[SYSTEM READY] Namma Lorry Algorithm Lab initialized. Select a test or run all to view live diagnostic logs.</div>
+            </div>
+
+          </div>
         </div>
       </section>
 
@@ -640,7 +757,7 @@
               Start: -- ➔ Stop: --
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btnCloseModal">✕ Close</button>
+          <button class="btn btn-secondary btn-sm" id="btnCloseModal" onclick="document.getElementById('tripSummaryModal').classList.remove('open')">✕ Close</button>
         </div>
 
         <!-- Start & Stop Summary Card in Modal -->
@@ -730,6 +847,11 @@
           </div>
         </div>
 
+        <!-- Large Touch-Friendly Mobile Close Button -->
+        <button class="btn btn-primary btn-lg" id="btnDoneCloseModal" style="width: 100%; margin-top: 20px;" onclick="document.getElementById('tripSummaryModal').classList.remove('open')">
+          <span>✓</span> Done &amp; Close Summary
+        </button>
+
       </div>
     </div>
 
@@ -742,15 +864,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- Application Logic Modules (Strict dependency order) -->
-  <script src="js/config.js?v=3.0"></script>
-  <script src="js/store.js?v=3.0"></script>
-  <script src="js/gps_filter.js?v=3.0"></script>
-  <script src="js/distance_engine.js?v=3.0"></script>
-  <script src="js/sync_engine.js?v=3.0"></script>
-  <script src="js/simulation_routes.js?v=3.0"></script>
-  <script src="js/gps_tracker.js?v=3.0"></script>
-  <script src="js/map_manager.js?v=3.0"></script>
-  <script src="js/test_runner.js?v=3.0"></script>
-  <script src="js/app.js?v=3.0"></script>
+  <script src="js/config.js?v=3.1"></script>
+  <script src="js/store.js?v=3.1"></script>
+  <script src="js/gps_filter.js?v=3.1"></script>
+  <script src="js/distance_engine.js?v=3.1"></script>
+  <script src="js/sync_engine.js?v=3.1"></script>
+  <script src="js/simulation_routes.js?v=3.1"></script>
+  <script src="js/gps_tracker.js?v=3.1"></script>
+  <script src="js/map_manager.js?v=3.1"></script>
+  <script src="js/lab_simulator.js?v=3.1"></script>
+  <script src="js/test_runner.js?v=3.1"></script>
+  <script src="js/app.js?v=3.1"></script>
 </body>
 </html>

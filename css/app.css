@@ -688,17 +688,34 @@
 /* ====================================================
    VIEW 4: ALGORITHM LAB & TEST SUITE (Section 31)
    ==================================================== */
+.lab-main-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.lab-simulator-card {
+  background: var(--nl-surface-card);
+  border: 1px solid var(--nl-surface-card-border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-md);
+}
+
 .test-suite-layout {
   display: grid;
-  grid-template-columns: 460px 1fr;
+  grid-template-columns: 480px 1fr;
   gap: 20px;
-  height: calc(100vh - 110px);
+  min-height: 480px;
 }
 
 .test-cases-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 600px;
   overflow-y: auto;
 }
 
@@ -707,16 +724,53 @@
   border: 1px solid var(--nl-surface-card-border);
   border-radius: var(--radius-md);
   padding: 16px;
-  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .test-case-item:hover {
   background: var(--nl-surface-card-hover);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .test-case-item.active {
   border-color: var(--nl-accent);
+}
+
+.badge-ready {
+  background: rgba(120, 140, 160, 0.15);
+  color: #a0b3c6;
+  border: 1px solid rgba(120, 140, 160, 0.3);
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.badge-running {
+  background: rgba(253, 101, 30, 0.2);
+  color: var(--nl-accent);
+  border: 1px solid var(--nl-accent);
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  animation: pulse-live 1s infinite;
+}
+
+.badge-passed {
+  background: rgba(0, 176, 116, 0.2);
+  color: var(--nl-success);
+  border: 1px solid var(--nl-success);
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.badge-failed {
+  background: rgba(255, 71, 87, 0.2);
+  color: var(--nl-error);
+  border: 1px solid var(--nl-error);
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
 }
 
 .test-log-console {
@@ -728,6 +782,7 @@
   flex-direction: column;
   font-family: var(--nl-font-mono);
   font-size: 0.8rem;
+  max-height: 600px;
   overflow-y: auto;
 }
 

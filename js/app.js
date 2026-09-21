@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const mapManager = window.nlMapManager;
   const syncEngine = window.nlSyncEngine;
   const testRunner = window.nlTestRunner;
+  const labSimulator = window.nlLabSimulator;
 
   // Cache DOM Elements
   const navTabs = document.querySelectorAll('.nav-tab');
@@ -110,6 +111,16 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (targetViewId === 'view-analytics') {
       renderDriverStats();
       renderTripHistoryTable();
+    } else if (targetViewId === 'view-lab') {
+      mapManager.initLabMap('labMap');
+      const corridorKey = labSimulator ? labSimulator.activeCorridorKey : 'chennai_sriperumbudur';
+      const corridor = window.nlCorridors && window.nlCorridors[corridorKey];
+      if (corridor && corridor.waypoints.length > 0) {
+        const p0 = corridor.waypoints[0];
+        mapManager.centerLabMap(p0.lat, p0.lng, 12);
+        mapManager.setLabStartMarker({ latitude: p0.lat, longitude: p0.lng });
+      }
+      setTimeout(() => mapManager.labMap && mapManager.labMap.invalidateSize(), 150);
     }
   }
 
@@ -254,6 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
   btnStartTrip.addEventListener('click', () => {
     mapManager.resetDriverMap();
 
+    // Reset duration timer HUD
+    if (hudDuration) hudDuration.textContent = '00:00';
+
     // Driver Cockpit is ALWAYS 100% Real Device GNSS Tracking!
     tracker.startTrip({ mode: 'device' });
 
@@ -276,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnEndTrip.disabled = true;
     btnEndTrip.innerHTML = '<span>⏳ Capturing Stopping Point & Mileage...</span>';
 
-    const tripRecord = await tracker.endTrip();
+    await tracker.endTrip();
 
     btnEndTrip.style.display = 'none';
     btnEndTrip.disabled = false;
@@ -285,32 +299,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hudTripBadge.className = 'badge badge-cyan';
     hudTripBadge.innerHTML = 'COMPLETED';
-
-    if (tripRecord) {
-      if (hudStopPlace) hudStopPlace.textContent = tripRecord.destination;
-      if (hudStopCoords) hudStopCoords.textContent = `Completed at ${new Date(tripRecord.endedAt).toLocaleTimeString()}`;
-      if (hudStopStatus) {
-        hudStopStatus.textContent = 'STOPPED';
-        hudStopStatus.className = 'location-status-badge stopped';
-      }
-
-      showTripCompletedModal(tripRecord);
-      renderDriverStats();
-      renderTripHistoryTable();
-      updateRecentSummaryBanner();
-    }
-  });
-
-  // =========================================================================
-  // Simulation Speed Pills
-  // =========================================================================
-  speedPills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      speedPills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      const speed = parseInt(pill.dataset.speed, 10) || 5;
-      tracker.setSimulationSpeed(speed);
-    });
   });
 
   // =========================================================================
@@ -495,14 +483,33 @@ document.addEventListener('DOMContentLoaded', () => {
     tripSummaryModal.classList.add('open');
   }
 
-  btnCloseModal.addEventListener('click', () => {
+  const btnDoneCloseModal = document.getElementById('btnDoneCloseModal');
+  const closeTripSummaryHandler = (e) => {
+    if (e && e.preventDefault && e.type !== 'click') e.preventDefault();
     tripSummaryModal.classList.remove('open');
-  });
+  };
+
+  if (btnCloseModal) {
+    btnCloseModal.addEventListener('click', closeTripSummaryHandler);
+    btnCloseModal.addEventListener('touchend', closeTripSummaryHandler);
+  }
+  if (btnDoneCloseModal) {
+    btnDoneCloseModal.addEventListener('click', closeTripSummaryHandler);
+    btnDoneCloseModal.addEventListener('touchend', closeTripSummaryHandler);
+  }
 
   // Close modal when clicking outside modal-card
   tripSummaryModal.addEventListener('click', (e) => {
     if (e.target === tripSummaryModal) {
       tripSummaryModal.classList.remove('open');
+    }
+  });
+
+  // Close with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (tripSummaryModal.classList.contains('open')) tripSummaryModal.classList.remove('open');
+      if (driverProfileModal && driverProfileModal.classList.contains('open')) closeDriverProfileModal();
     }
   });
 
@@ -751,12 +758,130 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // =========================================================================
-  // Algorithm Lab & Test Runner (Section 31)
+  // Algorithm Lab & Freight Corridor Simulator (Section 31)
   // =========================================================================
   const testConsole = document.getElementById('testConsole');
   const btnRunAllTests = document.getElementById('btnRunAllTests');
   const btnClearLogs = document.getElementById('btnClearLogs');
 
+  const btnLabStartSim = document.getElementById('btnLabStartSim');
+  const btnLabPauseSim = document.getElementById('btnLabPauseSim');
+  const btnLabResetSim = document.getElementById('btnLabResetSim');
+  const labCorridorSelect = document.getElementById('labCorridorSelect');
+  const labSpeedPills = document.querySelectorAll('.lab-speed-pill');
+  const btnLabInjectJump = document.getElementById('btnLabInjectJump');
+  const btnLabInjectBadAccuracy = document.getElementById('btnLabInjectBadAccuracy');
+  const labSimStatusBadge = document.getElementById('labSimStatusBadge');
+
+  const labTelemetrySpeed = document.getElementById('labTelemetrySpeed');
+  const labTelemetryInterval = document.getElementById('labTelemetryInterval');
+  const labTelemetryModelA = document.getElementById('labTelemetryModelA');
+  const labTelemetryModelB = document.getElementById('labTelemetryModelB');
+  const labTelemetryFilterRatio = document.getElementById('labTelemetryFilterRatio');
+  const labTelemetryWaypoint = document.getElementById('labTelemetryWaypoint');
+
+  // Corridor Selection in Lab
+  if (labCorridorSelect) {
+    labCorridorSelect.addEventListener('change', () => {
+      const key = labCorridorSelect.value;
+      if (labSimulator) labSimulator.setCorridor(key);
+      const corridor = window.nlCorridors ? window.nlCorridors[key] : null;
+      if (corridor && labTelemetryModelA) {
+        labTelemetryModelA.innerHTML = `${corridor.corridorDistanceKm} <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM</span>`;
+      }
+      if (corridor && corridor.waypoints.length > 0) {
+        mapManager.initLabMap('labMap');
+        const p0 = corridor.waypoints[0];
+        mapManager.centerLabMap(p0.lat, p0.lng, 12);
+        mapManager.setLabStartMarker({ latitude: p0.lat, longitude: p0.lng });
+      }
+    });
+  }
+
+  // Lab Speed Pills (1x, 2x, 5x, 10x, 20x)
+  labSpeedPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      labSpeedPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const speed = parseInt(pill.dataset.speed, 10) || 5;
+      if (labSimulator) labSimulator.setSpeed(speed);
+    });
+  });
+
+  // Lab Playback Controls
+  if (btnLabStartSim) {
+    btnLabStartSim.addEventListener('click', () => {
+      mapManager.initLabMap('labMap');
+      if (labSimulator) labSimulator.start();
+      if (labSimStatusBadge) {
+        labSimStatusBadge.textContent = 'RUNNING LIVE';
+        labSimStatusBadge.className = 'badge badge-accent';
+      }
+    });
+  }
+
+  if (btnLabPauseSim) {
+    btnLabPauseSim.addEventListener('click', () => {
+      if (labSimulator) labSimulator.pause();
+      if (labSimStatusBadge) {
+        labSimStatusBadge.textContent = 'PAUSED';
+        labSimStatusBadge.className = 'badge badge-cyan';
+      }
+    });
+  }
+
+  if (btnLabResetSim) {
+    btnLabResetSim.addEventListener('click', () => {
+      if (labSimulator) labSimulator.reset();
+      if (labSimStatusBadge) {
+        labSimStatusBadge.textContent = 'IDLE / READY';
+        labSimStatusBadge.className = 'badge badge-success';
+      }
+      if (labTelemetrySpeed) labTelemetrySpeed.innerHTML = `0.0 <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM/H</span>`;
+      if (labTelemetryInterval) labTelemetryInterval.textContent = 'Interval: 30s (Stationary)';
+      if (labTelemetryModelB) labTelemetryModelB.innerHTML = `0.0 <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM</span>`;
+      if (labTelemetryFilterRatio) labTelemetryFilterRatio.innerHTML = `0 <span style="font-size: 0.75rem; color: var(--nl-success);">OK</span> / 0 <span style="font-size: 0.75rem; color: var(--nl-error);">FLTR</span>`;
+      if (labTelemetryWaypoint) labTelemetryWaypoint.textContent = 'Waypoint: Idle (0/16)';
+    });
+  }
+
+  // Anomaly Injections
+  if (btnLabInjectJump) {
+    btnLabInjectJump.addEventListener('click', () => {
+      if (labSimulator) labSimulator.injectAnomaly('jump');
+    });
+  }
+
+  if (btnLabInjectBadAccuracy) {
+    btnLabInjectBadAccuracy.addEventListener('click', () => {
+      if (labSimulator) labSimulator.injectAnomaly('accuracy');
+    });
+  }
+
+  // Lab Simulator Realtime Telemetry Updates
+  if (labSimulator) {
+    labSimulator.onUpdate(evt => {
+      if (evt.type === 'step_valid' || evt.type === 'step_rejected') {
+        const interval = evt.speedKmH > 50 ? '5s (Highway Cruising)' : evt.speedKmH > 10 ? '10s (City Driving)' : '30s (Stationary)';
+        if (labTelemetrySpeed) labTelemetrySpeed.innerHTML = `${evt.speedKmH.toFixed(1)} <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM/H</span>`;
+        if (labTelemetryInterval) labTelemetryInterval.textContent = `Interval: ${interval}`;
+        if (labTelemetryModelB) labTelemetryModelB.innerHTML = `${evt.accumulatedKm.toFixed(1)} <span style="font-size: 0.75rem; font-weight: normal; color: var(--nl-text-muted);">KM</span>`;
+        if (labTelemetryFilterRatio) {
+          labTelemetryFilterRatio.innerHTML = `${evt.validCount} <span style="font-size: 0.75rem; color: var(--nl-success);">OK</span> / ${evt.rejectedCount} <span style="font-size: 0.75rem; color: var(--nl-error);">FLTR</span>`;
+        }
+        if (labTelemetryWaypoint) {
+          labTelemetryWaypoint.textContent = `Step ${evt.stepIndex}/${evt.totalSteps} • ${evt.point.name || 'Waypoint'}`;
+        }
+      } else if (evt.type === 'completed') {
+        if (labSimStatusBadge) {
+          labSimStatusBadge.textContent = 'COMPLETED';
+          labSimStatusBadge.className = 'badge badge-success';
+        }
+      }
+    });
+  }
+
+  // Test Runner Console & Logging
   testRunner.setLogListener(entry => {
     if (entry.clear) {
       testConsole.innerHTML = '';
@@ -767,6 +892,15 @@ document.addEventListener('DOMContentLoaded', () => {
     line.innerHTML = `<span style="color: #627790;">[${entry.timestamp}]</span> ${entry.msg}`;
     testConsole.appendChild(line);
     testConsole.scrollTop = testConsole.scrollHeight;
+  });
+
+  // Test Runner Status Badges
+  testRunner.onStatusChange(({ testNum, status, details }) => {
+    const badge = document.getElementById(`badgeTest${testNum}`);
+    if (badge) {
+      badge.className = `badge badge-${status}`;
+      badge.textContent = details || status.toUpperCase();
+    }
   });
 
   btnRunAllTests.addEventListener('click', async () => {

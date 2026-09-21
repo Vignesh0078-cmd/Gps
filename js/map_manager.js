@@ -11,6 +11,7 @@ class MapManager {
   constructor() {
     this.driverMap = null;
     this.adminMap = null;
+    this.labMap = null;
 
     this.truckMarker = null;
     this.startMarker = null;
@@ -19,6 +20,12 @@ class MapManager {
     this.roadPolyline = null;
     this.noiseMarkersLayer = null;
     this.followTruck = true;
+
+    this.labTruckMarker = null;
+    this.labStartMarker = null;
+    this.labFinishMarker = null;
+    this.labGpsPolyline = null;
+    this.labNoiseLayer = null;
 
     this.adminMarkers = {};
   }
@@ -441,6 +448,135 @@ class MapManager {
       `);
 
     this.adminMarkers[v.id] = marker;
+  }
+
+  /* =========================================================================
+     Algorithm Lab Map (view-lab)
+     ========================================================================= */
+  initLabMap(elementId = 'labMap') {
+    const el = document.getElementById(elementId);
+    if (!el || this.labMap) return;
+
+    this.labMap = L.map(elementId, {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([13.0827, 80.2707], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(this.labMap);
+
+    this.labGpsPolyline = L.polyline([], {
+      color: '#00b074',
+      weight: 5,
+      opacity: 0.9,
+      lineCap: 'round'
+    }).addTo(this.labMap);
+
+    this.labNoiseLayer = L.layerGroup().addTo(this.labMap);
+
+    const truckIcon = L.divIcon({
+      className: 'lab-truck-pin',
+      html: `
+        <div style="
+          width: 36px; height: 36px;
+          background: #001428;
+          border: 2px solid #00d2d3;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          color: #ffffff;
+          box-shadow: 0 0 16px rgba(0, 210, 211, 0.8);
+          transform-origin: center center;
+          font-size: 18px;
+        ">🚛</div>
+      `,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+
+    this.labTruckMarker = L.marker([13.0827, 80.2707], { icon: truckIcon }).addTo(this.labMap);
+  }
+
+  updateLabTruck(point) {
+    if (!this.labMap || !this.labTruckMarker) return;
+    const latLng = [point.latitude, point.longitude];
+    this.labTruckMarker.setLatLng(latLng);
+
+    if (this.labGpsPolyline) {
+      this.labGpsPolyline.addLatLng(latLng);
+    }
+
+    const heading = point.heading || 0;
+    const iconEl = this.labTruckMarker.getElement();
+    if (iconEl) {
+      const inner = iconEl.querySelector('div');
+      if (inner) inner.style.transform = `rotate(${heading}deg)`;
+    }
+
+    this.labMap.panTo(latLng, { animate: true, duration: 0.4 });
+  }
+
+  setLabStartMarker(point) {
+    if (!this.labMap || !point) return;
+    if (this.labStartMarker) this.labMap.removeLayer(this.labStartMarker);
+
+    const icon = L.divIcon({
+      className: 'lab-start-pin',
+      html: `<div style="background: #00b074; color: #fff; border: 2px solid #fff; padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; white-space: nowrap; box-shadow: 0 0 10px rgba(0,176,116,0.8);">🟢 Corridor Origin</div>`,
+      iconSize: [95, 24],
+      iconAnchor: [47, 12]
+    });
+    this.labStartMarker = L.marker([point.latitude, point.longitude], { icon }).addTo(this.labMap);
+  }
+
+  setLabFinishMarker(point) {
+    if (!this.labMap || !point) return;
+    if (this.labFinishMarker) this.labMap.removeLayer(this.labFinishMarker);
+
+    const icon = L.divIcon({
+      className: 'lab-finish-pin',
+      html: `<div style="background: #ff4757; color: #fff; border: 2px solid #fff; padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; white-space: nowrap; box-shadow: 0 0 10px rgba(255,71,87,0.8);">🏁 Destination Reached</div>`,
+      iconSize: [120, 24],
+      iconAnchor: [60, 12]
+    });
+    this.labFinishMarker = L.marker([point.latitude, point.longitude], { icon }).addTo(this.labMap);
+  }
+
+  addLabNoiseMarker(point, reason, message) {
+    if (!this.labNoiseLayer) return;
+    const noiseIcon = L.divIcon({
+      className: 'lab-noise-pin',
+      html: `<div style="width: 16px; height: 16px; background: #ff4757; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 12px rgba(255,71,87,1); animation: pulse-live 1s infinite;"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+
+    const marker = L.marker([point.latitude, point.longitude], { icon: noiseIcon })
+      .bindPopup(`
+        <div style="color: #0b1c30; font-family: sans-serif; font-size: 11px; padding: 2px;">
+          <strong style="color: #ff4757;">⚠️ Filter Anomaly Detected</strong><br>
+          <b>Rule Check:</b> ${reason}<br>
+          <b>Detail:</b> ${message || 'Rejected by GPS quality checks'}
+        </div>
+      `);
+    this.labNoiseLayer.addLayer(marker);
+  }
+
+  centerLabMap(lat, lng, zoom = 12) {
+    if (this.labMap) this.labMap.setView([lat, lng], zoom);
+  }
+
+  resetLabMap() {
+    if (this.labGpsPolyline) this.labGpsPolyline.setLatLngs([]);
+    if (this.labNoiseLayer) this.labNoiseLayer.clearLayers();
+    if (this.labStartMarker && this.labMap) {
+      this.labMap.removeLayer(this.labStartMarker);
+      this.labStartMarker = null;
+    }
+    if (this.labFinishMarker && this.labMap) {
+      this.labMap.removeLayer(this.labFinishMarker);
+      this.labFinishMarker = null;
+    }
   }
 }
 
