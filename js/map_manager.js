@@ -182,29 +182,33 @@ class MapManager {
     this.startMarker = L.marker(latLng, { icon: startIcon }).addTo(this.driverMap);
   }
 
-  setFinishMarker(point) {
+  setFinishMarker(point, isStationary = false) {
     if (!this.driverMap || !point) return;
     if (this.finishMarker) {
       this.driverMap.removeLayer(this.finishMarker);
+      this.finishMarker = null;
     }
     const latLng = [point.latitude, point.longitude];
+    const text = isStationary ? '🛑 Stopped at Start (0.0 KM)' : '🏁 Finish Point';
+    const bg = isStationary ? '#e67e22' : '#ff4757';
+    const shadowColor = isStationary ? 'rgba(230, 126, 34, 0.8)' : 'rgba(255, 71, 87, 0.8)';
     const finishIcon = L.divIcon({
       className: 'finish-flag-pin',
       html: `
         <div style="
-          background: #ff4757;
+          background: ${bg};
           color: #ffffff;
           border: 2px solid #ffffff;
           padding: 4px 8px;
           border-radius: 12px;
           font-size: 11px;
           font-weight: bold;
-          box-shadow: 0 0 10px rgba(255, 71, 87, 0.8);
+          box-shadow: 0 0 10px ${shadowColor};
           white-space: nowrap;
-        ">🏁 Finish Point</div>
+        ">${text}</div>
       `,
-      iconSize: [90, 26],
-      iconAnchor: [45, 13]
+      iconSize: [isStationary ? 140 : 90, 26],
+      iconAnchor: [isStationary ? 70 : 45, 13]
     });
     this.finishMarker = L.marker(latLng, { icon: finishIcon }).addTo(this.driverMap);
   }

@@ -49,7 +49,10 @@ class SyncEngine {
   handleNetworkChange(isOnline) {
     this.store.setOnlineStatus(isOnline);
     this.notifySyncListeners({ type: 'network_status', isOnline });
-    if (isOnline) this.triggerSync();
+    if (isOnline) {
+      this.syncPendingTripsToCloud();
+      this.triggerSync();
+    }
   }
 
   toggleSimulatedNetwork() {
@@ -398,12 +401,14 @@ class SyncEngine {
   }
 
   /**
-   * Save a completed Trip record to Supabase `trips` table with full audit metadata
+   * Save a completed Trip record to Supabase `trips` table with full audit metadata.
+   * If offline or client unavailable, queues trip into local pendingTripsQueue for automatic retry.
    */
   async saveTrip(trip) {
-    if (!this.db) {
-      console.warn('[SyncEngine] Cannot save trip: Supabase client not available');
-      return;
+    if (!this.db || !this.store.isOnline()) {
+      console.warn('[SyncEngine] Offline or Supabase client not ready. Queueing trip for upload:', trip.id);
+      this.store.addPendingTrip(trip);
+      return false;
     }
     try {
       const meta = {
@@ -434,13 +439,33 @@ class SyncEngine {
         }, { onConflict: 'id' });
 
       if (error) {
-        console.warn('[SyncEngine] Trip save error:', error.message);
+        console.warn('[SyncEngine] Trip save error, queued for retry:', error.message);
+        this.store.addPendingTrip(trip);
+        return false;
       } else {
         console.log('[SyncEngine] ✅ Trip saved to Supabase with full summary:', trip.id);
+        this.store.markTripSynced(trip.id);
         this.notifySyncListeners({ type: 'trip_saved_cloud', tripId: trip.id });
+        return true;
       }
     } catch (err) {
-      console.warn('[SyncEngine] Trip save failed:', err.message);
+      console.warn('[SyncEngine] Trip save exception, queued for retry:', err.message);
+      this.store.addPendingTrip(trip);
+      return false;
+    }
+  }
+
+  /**
+   * Upload all pending trips stored offline to Supabase
+   */
+  async syncPendingTripsToCloud() {
+    if (!this.db || !this.store.isOnline()) return;
+    const pendingTrips = this.store.getPendingTripsQueue();
+    if (!pendingTrips || pendingTrips.length === 0) return;
+
+    console.log(`[SyncEngine] 🔄 Uploading ${pendingTrips.length} pending trips to Supabase...`);
+    for (const trip of [...pendingTrips]) {
+      await this.saveTrip(trip);
     }
   }
 
@@ -483,6 +508,7 @@ class SyncEngine {
    */
   async syncTripsFromCloud() {
     try {
+      await this.syncPendingTripsToCloud();
       const activeDriver = this.store.getActiveDriver();
       const driverId = activeDriver ? activeDriver.id : null;
       console.log('[SyncEngine] 🔄 Hydrating trips from Supabase cloud...');

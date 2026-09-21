@@ -14,6 +14,7 @@ const SEED_DATA = {
   activeDriverId: 'DRV-101',
   isOnline: true,
   offlineQueue: [],
+  pendingTripsQueue: [],
   drivers: [
     {
       id: 'DRV-101',
@@ -158,6 +159,29 @@ class Store {
     return this.data.vehicles.find(v => v.id === driver.vehicleId) || this.data.vehicles[0];
   }
 
+  getAllDrivers() {
+    return this.data.drivers || [];
+  }
+
+  updateActiveDriverProfile({ name, phone, vehicleNumber, vehicleType, capacity } = {}) {
+    const driver = this.getActiveDriver();
+    if (driver) {
+      if (name && name.trim()) {
+        driver.name = name.trim();
+        driver.avatar = name.trim().charAt(0).toUpperCase();
+      }
+      if (phone && phone.trim()) driver.phone = phone.trim();
+    }
+    const vehicle = this.getActiveVehicle();
+    if (vehicle) {
+      if (vehicleNumber && vehicleNumber.trim()) vehicle.vehicleNumber = vehicleNumber.trim().toUpperCase();
+      if (vehicleType && vehicleType.trim()) vehicle.vehicleType = vehicleType.trim();
+      if (capacity && capacity.trim()) vehicle.capacity = capacity.trim();
+    }
+    this.save();
+    return { driver, vehicle };
+  }
+
   // Network Online / Offline toggle
   isOnline() {
     return this.data.isOnline;
@@ -168,7 +192,7 @@ class Store {
     this.save();
   }
 
-  // Offline Queue
+  // Offline Queue for GPS Points
   getOfflineQueue() {
     return this.data.offlineQueue || [];
   }
@@ -195,6 +219,38 @@ class Store {
     this.data.offlineQueue = this.data.offlineQueue.filter(p => !set.has(p.id) && !set.has(p.local_point_id));
     this.save();
     return initialCount - this.data.offlineQueue.length;
+  }
+
+  // Offline Queue for Completed Trips (ensures every phone's drive summary is uploaded)
+  getPendingTripsQueue() {
+    return this.data.pendingTripsQueue || [];
+  }
+
+  addPendingTrip(trip) {
+    if (!this.data.pendingTripsQueue) this.data.pendingTripsQueue = [];
+    this.data.pendingTripsQueue = this.data.pendingTripsQueue.filter(t => t.id !== trip.id);
+    this.data.pendingTripsQueue.push(trip);
+    this.save();
+    return this.data.pendingTripsQueue.length;
+  }
+
+  removePendingTrip(tripId) {
+    if (!this.data.pendingTripsQueue) return 0;
+    const initialCount = this.data.pendingTripsQueue.length;
+    this.data.pendingTripsQueue = this.data.pendingTripsQueue.filter(t => t.id !== tripId);
+    this.save();
+    return initialCount - this.data.pendingTripsQueue.length;
+  }
+
+  markTripSynced(tripId) {
+    if (this.data.trips) {
+      const trip = this.data.trips.find(t => t.id === tripId);
+      if (trip) {
+        trip.synced_to_cloud = true;
+      }
+    }
+    this.removePendingTrip(tripId);
+    this.save();
   }
 
   // Trips
@@ -228,8 +284,30 @@ class Store {
       return true;
     });
 
+    // Two-Way Merge: Keep all existing local trips, merge with incoming cloud trips
+    // This ensures local trips waiting to sync or completed on this phone are NEVER wiped out!
+    const tripMap = new Map();
+    (this.data.trips || []).forEach(t => {
+      if (t && t.id) tripMap.set(t.id, t);
+    });
+
+    realTrips.forEach(ct => {
+      if (ct && ct.id) {
+        const existing = tripMap.get(ct.id) || {};
+        tripMap.set(ct.id, {
+          ...existing,
+          ...ct,
+          // Preserve local telemetry details if existing has them
+          pointsCaptured: ct.pointsCaptured || existing.pointsCaptured || 1,
+          pointsFiltered: ct.pointsFiltered !== undefined ? ct.pointsFiltered : (existing.pointsFiltered || 0),
+          breakdown: ct.breakdown || existing.breakdown,
+          synced_to_cloud: true
+        });
+      }
+    });
+
     // Sort descending by startedAt
-    const sorted = [...realTrips].sort((a, b) => {
+    const sorted = Array.from(tripMap.values()).sort((a, b) => {
       const ta = new Date(a.startedAt || a.started_at || a.created_at || 0).getTime();
       const tb = new Date(b.startedAt || b.started_at || b.created_at || 0).getTime();
       return tb - ta;

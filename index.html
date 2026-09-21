@@ -60,13 +60,14 @@
           <span class="badge badge-warning" id="queueCounterBadge" style="display: none; margin-left: 4px;">0 PENDING</span>
         </button>
 
-        <!-- Driver Profile Indicator -->
-        <div class="driver-profile-pill">
+        <!-- Driver Profile Indicator (Click to switch driver / vehicle) -->
+        <div class="driver-profile-pill" id="headerDriverProfile" title="Click to Switch Driver / Lorry Identity">
           <div class="driver-avatar" id="headerDriverAvatar">K</div>
           <div class="driver-details">
             <div class="driver-name" id="headerDriverName">Kumar K.</div>
             <div class="driver-lorry" id="headerDriverVehicle">TN 01 AB 1234 (25 Ton)</div>
           </div>
+          <span style="font-size: 0.72rem; color: var(--nl-accent); margin-left: 2px;">✏️</span>
         </div>
       </div>
     </header>
@@ -160,8 +161,8 @@
 
               <!-- GPS Helper Actions -->
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <button class="btn btn-secondary btn-sm" id="btnRecalibrateGps" title="Refresh GPS coordinates and address" style="font-size: 0.72rem; padding: 4px 8px;">
-                  <span>🔄</span> Refresh My GPS
+                <button class="btn btn-secondary btn-sm" id="btnRecalibrateGps" title="Lock your current GPS coordinates as trip start" style="font-size: 0.72rem; padding: 4px 10px;">
+                  <span>🔒</span> Lock / Re-acquire Start GPS
                 </button>
                 <span style="font-size: 0.72rem; color: var(--nl-text-muted);" id="gpsLockAccuracyNotice">GNSS Accuracy: ±--m</span>
               </div>
@@ -210,37 +211,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Collapsible Developer / Corridor Simulation Tool (Optional) -->
-              <details class="sim-details-toggle" id="simDetailsToggle" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
-                <summary style="cursor: pointer; font-size: 0.75rem; color: var(--nl-text-muted); outline: none;">
-                  🧪 Corridor Replay Simulator (Test / Demo Only)
-                </summary>
-                <div style="padding-top: 10px;">
-                  <div class="route-selector-group">
-                    <label for="trackingModeSelect">Tracking Mode</label>
-                    <select id="trackingModeSelect" class="select-input">
-                      <option value="device" selected>Real Device GPS (Primary Mode)</option>
-                      <option value="simulation">Corridor Replay Simulator (Test Mode)</option>
-                    </select>
-                  </div>
-                  <div class="route-selector-group" id="corridorGroup" style="display: none;">
-                    <label for="corridorSelect">Simulation Route Corridor</label>
-                    <select id="corridorSelect" class="select-input">
-                      <option value="chennai_sriperumbudur">Chennai Port ➔ Sriperumbudur (42 km)</option>
-                      <option value="chennai_vellore">Chennai Port ➔ Vellore Hub (138 km)</option>
-                      <option value="chennai_bengaluru">Chennai Port ➔ Bengaluru (348.5 km)</option>
-                    </select>
-                  </div>
-                  <div class="sim-speed-pills" style="margin-top: 8px;">
-                    <button class="speed-pill" data-speed="1">1×</button>
-                    <button class="speed-pill" data-speed="2">2×</button>
-                    <button class="speed-pill active" data-speed="5">5×</button>
-                    <button class="speed-pill" data-speed="10">10×</button>
-                    <button class="speed-pill" data-speed="20">20×</button>
-                  </div>
-                </div>
-              </details>
             </div>
 
             <!-- GPS Quality & Queue Status Card (Sections 8, 12, 14) -->
@@ -603,6 +573,59 @@
         <span class="mobile-nav-label">Lab</span>
       </button>
     </nav>
+
+    <!-- ============================================================
+         MODAL: DRIVER & PHONE IDENTITY SELECTOR
+         ============================================================ -->
+    <div class="modal-backdrop" id="driverProfileModal">
+      <div class="modal-card" style="max-width: 480px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <div>
+            <span class="badge badge-accent">PHONE &amp; DRIVER IDENTITY</span>
+            <h3 style="margin-top: 4px;">Select or Customize Driver</h3>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnCloseDriverModal">✕</button>
+        </div>
+
+        <p style="font-size: 0.8rem; color: var(--nl-text-secondary); margin-bottom: 16px;">
+          Set which driver profile is using this phone. Drives completed on this device will be stored under this identity and synced to Supabase.
+        </p>
+
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.75rem; color: var(--nl-text-muted); margin-bottom: 6px; text-transform: uppercase;">
+            Choose Driver Preset
+          </label>
+          <select id="modalDriverSelect" class="select-input" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); background: var(--nl-surface-dim); color: #ffffff; border: 1px solid var(--nl-surface-card-border);">
+            <option value="DRV-101">Kumar K. (TN 01 AB 1234 - Heavy Truck)</option>
+            <option value="DRV-102">Selvam M. (TN 09 BC 5678 - Multi-Axle Trailer)</option>
+            <option value="DRV-103">Raja V. (KA 04 CD 9012 - Container Lorry)</option>
+            <option value="custom">✏️ Custom Driver / My Phone</option>
+          </select>
+        </div>
+
+        <div id="customDriverFields" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+          <div>
+            <label style="display: block; font-size: 0.72rem; color: var(--nl-text-muted); margin-bottom: 4px;">Driver Full Name</label>
+            <input type="text" id="modalDriverNameInput" class="text-input" placeholder="e.g., Vignesh / Suresh" style="width: 100%; padding: 8px 12px; background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); border-radius: var(--radius-sm); color: #ffffff;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.72rem; color: var(--nl-text-muted); margin-bottom: 4px;">Driver Phone Number</label>
+            <input type="tel" id="modalDriverPhoneInput" class="text-input" placeholder="+91 98765 43210" style="width: 100%; padding: 8px 12px; background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); border-radius: var(--radius-sm); color: #ffffff;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.72rem; color: var(--nl-text-muted); margin-bottom: 4px;">Vehicle / Lorry Registration Number</label>
+            <input type="text" id="modalVehicleNumInput" class="text-input" placeholder="TN 23 XY 9999" style="width: 100%; padding: 8px 12px; background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); border-radius: var(--radius-sm); color: #ffffff; text-transform: uppercase;">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn btn-secondary btn-sm" id="btnCancelDriverModal">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="btnSaveDriverProfile">
+            <span>💾</span> Save Phone Profile
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- ============================================================
          MODAL: TRIP COMPLETED & MULTI-MODEL AUDIT SUMMARY (Section 23)

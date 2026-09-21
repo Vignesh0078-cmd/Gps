@@ -134,6 +134,14 @@
   background: var(--nl-surface-card);
   border: 1px solid var(--nl-surface-card-border);
   border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.driver-profile-pill:hover {
+  border-color: var(--nl-accent);
+  background: rgba(253, 101, 30, 0.1);
 }
 
 .driver-avatar {

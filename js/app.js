@@ -37,9 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const hudStopStatus = document.getElementById('hudStopStatus');
   const modalStartLoc = document.getElementById('modalStartLoc');
   const modalStopLoc = document.getElementById('modalStopLoc');
-  const trackingModeSelect = document.getElementById('trackingModeSelect');
-  const corridorSelect = document.getElementById('corridorSelect');
-  const speedPills = document.querySelectorAll('.speed-pill');
   const networkToggleBtn = document.getElementById('networkToggleBtn');
   const networkStatusDot = document.getElementById('networkStatusDot');
   const networkStatusText = document.getElementById('networkStatusText');
@@ -49,6 +46,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const recentSummaryBanner = document.getElementById('recentSummaryBanner');
   const recentSummaryText = document.getElementById('recentSummaryText');
   const btnOpenRecentSummary = document.getElementById('btnOpenRecentSummary');
+
+  // Driver Identity Modal Elements
+  const headerDriverProfile = document.getElementById('headerDriverProfile');
+  const driverProfileModal = document.getElementById('driverProfileModal');
+  const btnCloseDriverModal = document.getElementById('btnCloseDriverModal');
+  const btnCancelDriverModal = document.getElementById('btnCancelDriverModal');
+  const btnSaveDriverProfile = document.getElementById('btnSaveDriverProfile');
+  const modalDriverSelect = document.getElementById('modalDriverSelect');
+  const modalDriverNameInput = document.getElementById('modalDriverNameInput');
+  const modalDriverPhoneInput = document.getElementById('modalDriverPhoneInput');
+  const modalVehicleNumInput = document.getElementById('modalVehicleNumInput');
 
   // Modal Elements
   const tripSummaryModal = document.getElementById('tripSummaryModal');
@@ -125,12 +133,91 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const corridorGroup = document.getElementById('corridorGroup');
 
-  // Auto-detect driver's real current location on load
+  // Driver Identity Modal Wiring
+  function openDriverProfileModal() {
+    const activeDriver = store.getActiveDriver();
+    const activeVehicle = store.getActiveVehicle();
+    if (modalDriverSelect) modalDriverSelect.value = activeDriver.id || 'DRV-101';
+    if (modalDriverNameInput) modalDriverNameInput.value = activeDriver.name || '';
+    if (modalDriverPhoneInput) modalDriverPhoneInput.value = activeDriver.phone || '';
+    if (modalVehicleNumInput) modalVehicleNumInput.value = activeVehicle.vehicleNumber || '';
+    if (driverProfileModal) driverProfileModal.classList.add('open');
+  }
+
+  function closeDriverProfileModal() {
+    if (driverProfileModal) driverProfileModal.classList.remove('open');
+  }
+
+  if (headerDriverProfile) {
+    headerDriverProfile.addEventListener('click', openDriverProfileModal);
+  }
+  if (btnCloseDriverModal) btnCloseDriverModal.addEventListener('click', closeDriverProfileModal);
+  if (btnCancelDriverModal) btnCancelDriverModal.addEventListener('click', closeDriverProfileModal);
+
+  // Close driver modal when clicking outside
+  if (driverProfileModal) {
+    driverProfileModal.addEventListener('click', (e) => {
+      if (e.target === driverProfileModal) closeDriverProfileModal();
+    });
+  }
+
+  if (modalDriverSelect) {
+    modalDriverSelect.addEventListener('change', () => {
+      const selectedId = modalDriverSelect.value;
+      if (selectedId === 'custom') {
+        if (modalDriverNameInput) modalDriverNameInput.value = '';
+        if (modalDriverPhoneInput) modalDriverPhoneInput.value = '';
+        if (modalVehicleNumInput) modalVehicleNumInput.value = '';
+      } else {
+        const drivers = store.getAllDrivers();
+        const found = drivers.find(d => d.id === selectedId);
+        if (found) {
+          if (modalDriverNameInput) modalDriverNameInput.value = found.name;
+          if (modalDriverPhoneInput) modalDriverPhoneInput.value = found.phone || '';
+          const vehicles = store.data.vehicles || [];
+          const v = vehicles.find(veh => veh.id === found.vehicleId);
+          if (modalVehicleNumInput && v) modalVehicleNumInput.value = v.vehicleNumber;
+        }
+      }
+    });
+  }
+
+  if (btnSaveDriverProfile) {
+    btnSaveDriverProfile.addEventListener('click', async () => {
+      const selectedPreset = modalDriverSelect ? modalDriverSelect.value : 'DRV-101';
+      const customName = modalDriverNameInput ? modalDriverNameInput.value.trim() : '';
+      const customPhone = modalDriverPhoneInput ? modalDriverPhoneInput.value.trim() : '';
+      const customVehicle = modalVehicleNumInput ? modalVehicleNumInput.value.trim() : '';
+
+      if (selectedPreset !== 'custom') {
+        store.setActiveDriver(selectedPreset);
+      }
+      if (customName || customVehicle) {
+        store.updateActiveDriverProfile({
+          name: customName,
+          phone: customPhone,
+          vehicleNumber: customVehicle
+        });
+      }
+
+      renderDriverProfile();
+      renderDriverStats();
+      closeDriverProfileModal();
+
+      // Hydrate trips for the newly selected driver
+      await syncEngine.syncTripsFromCloud();
+      renderDriverStats();
+      renderTripHistoryTable();
+      updateRecentSummaryBanner();
+    });
+  }
+
+  // Auto-detect driver's real current location on load & lock start location firmly
   function initRealGpsDetection() {
-    if (hudStartPlace) hudStartPlace.textContent = 'Detecting your GPS location...';
-    if (hudStartCoords) hudStartCoords.textContent = 'Acquiring GNSS fix...';
+    if (hudStartPlace) hudStartPlace.textContent = 'Locking your GPS location...';
+    if (hudStartCoords) hudStartCoords.textContent = 'Acquiring satellite GNSS fix...';
     if (hudStartStatus) {
-      hudStartStatus.textContent = 'LOCATING...';
+      hudStartStatus.textContent = 'LOCKING...';
       hudStartStatus.className = 'location-status-badge ready';
     }
 
@@ -139,14 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hudStartPlace) hudStartPlace.textContent = loc.address;
         if (hudStartCoords) hudStartCoords.textContent = `${loc.latitude.toFixed(5)}°, ${loc.longitude.toFixed(5)}° (±${Math.round(loc.accuracy)}m)`;
         if (hudStartStatus) {
-          hudStartStatus.textContent = 'READY TO START';
+          hudStartStatus.textContent = '🔒 FIXED & READY';
           hudStartStatus.className = 'location-status-badge ready';
         }
-        if (gpsLockAccuracyNotice) gpsLockAccuracyNotice.textContent = `GNSS Accuracy: ±${Math.round(loc.accuracy)}m`;
+        if (gpsLockAccuracyNotice) gpsLockAccuracyNotice.textContent = `GNSS Accuracy: ±${Math.round(loc.accuracy)}m (Fixed)`;
         if (hudAccuracy) hudAccuracy.textContent = `±${Math.round(loc.accuracy)}m`;
       } else {
         if (hudStartPlace) hudStartPlace.textContent = 'Location access required';
-        if (hudStartCoords) hudStartCoords.textContent = 'Please allow location in browser';
+        if (hudStartCoords) hudStartCoords.textContent = 'Please enable GPS / Location in browser';
         if (hudStartStatus) hudStartStatus.textContent = 'GPS OFF';
       }
     });
@@ -158,41 +245,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function syncModeUI() {
-    if (!trackingModeSelect) return;
-    if (trackingModeSelect.value === 'device') {
-      if (corridorGroup) corridorGroup.style.display = 'none';
-      initRealGpsDetection();
-    } else {
-      if (corridorGroup) corridorGroup.style.display = 'block';
-    }
-  }
-
-  // Initial detection & sync UI
-  syncModeUI();
-
-  // Mode change handler
-  if (trackingModeSelect) {
-    trackingModeSelect.addEventListener('change', () => {
-      syncModeUI();
-    });
-  }
+  // Initial detection
+  initRealGpsDetection();
 
   // =========================================================================
-  // Trip Start & Stop
+  // Trip Start & Stop (Real Device GPS Mode Only in Cockpit)
   // =========================================================================
   btnStartTrip.addEventListener('click', () => {
-    const mode = trackingModeSelect ? trackingModeSelect.value : 'device';
-    const corridor = corridorSelect ? corridorSelect.value : 'chennai_sriperumbudur';
-
     mapManager.resetDriverMap();
 
-    tracker.startTrip({ mode, corridorKey: corridor });
+    // Driver Cockpit is ALWAYS 100% Real Device GNSS Tracking!
+    tracker.startTrip({ mode: 'device' });
 
     btnStartTrip.style.display = 'none';
     btnEndTrip.style.display = 'inline-flex';
-    if (trackingModeSelect) trackingModeSelect.disabled = true;
-    if (corridorSelect) corridorSelect.disabled = true;
 
     hudTripBadge.className = 'badge badge-success';
     hudTripBadge.innerHTML = '<span class="pulsing-dot online"></span> TRIP ACTIVE';
@@ -216,8 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btnEndTrip.disabled = false;
     btnEndTrip.innerHTML = '<span>🛑 STOP TRIP &amp; RECORD STOPPING POINT</span>';
     btnStartTrip.style.display = 'inline-flex';
-    if (trackingModeSelect) trackingModeSelect.disabled = false;
-    if (corridorSelect) corridorSelect.disabled = false;
 
     hudTripBadge.className = 'badge badge-cyan';
     hudTripBadge.innerHTML = 'COMPLETED';
@@ -337,6 +401,35 @@ document.addEventListener('DOMContentLoaded', () => {
       mapManager.addNoiseMarker(evt.point, evt.reason, evt.message);
     } else if (evt.type === 'timer_tick') {
       hudDuration.textContent = evt.elapsedFormatted;
+    } else if (evt.type === 'trip_ended') {
+      btnEndTrip.style.display = 'none';
+      btnEndTrip.disabled = false;
+      btnEndTrip.innerHTML = '<span>🛑 STOP TRIP &amp; RECORD STOPPING POINT</span>';
+      btnStartTrip.style.display = 'inline-flex';
+
+      hudTripBadge.className = 'badge badge-cyan';
+      hudTripBadge.innerHTML = 'COMPLETED';
+
+      if (evt.trip) {
+        if (hudStopPlace) hudStopPlace.textContent = evt.trip.destination;
+        if (hudStopCoords) hudStopCoords.textContent = `Completed at ${new Date(evt.trip.endedAt).toLocaleTimeString()}`;
+        if (hudStopStatus) {
+          hudStopStatus.textContent = 'STOPPED';
+          hudStopStatus.className = 'location-status-badge stopped';
+        }
+        showTripCompletedModal(evt.trip);
+        renderDriverStats();
+        renderTripHistoryTable();
+        updateRecentSummaryBanner();
+      }
+    } else if (evt.type === 'gps_error') {
+      if (hudStartStatus) {
+        hudStartStatus.textContent = 'GPS ERROR';
+        hudStartStatus.className = 'location-status-badge stopped';
+      }
+      if (gpsLockAccuracyNotice) {
+        gpsLockAccuracyNotice.textContent = evt.message || 'GPS Error: Check permissions';
+      }
     }
   });
 
