@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Namma Lorry — Technical Implementation Presentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b1523;
+      --bg-card: #132238;
+      --border-card: #263b5a;
+      --primary-orange: #ea580c;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #060b13;
+      color: var(--text-main);
+      font-family: var(--font-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Top Control Bar */
+    .deck-header {
+      height: 52px;
+      background: rgba(11, 21, 35, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+
+    .brand-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      height: 28px;
+      border-radius: 4px;
+    }
+
+    .brand-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-title span {
+      color: var(--primary-orange);
+    }
+
+    .brand-badge {
+      background: rgba(234, 88, 12, 0.15);
+      color: var(--primary-orange);
+      border: 1px solid rgba(234, 88, 12, 0.35);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .nav-btn:hover {
+      background: #1e3555;
+      border-color: var(--primary-orange);
+      transform: translateY(-1px);
+    }
+
+    .slide-counter {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 65px;
+      text-align: center;
+    }
+
+    /* Slide Deck Stage */
+    .deck-viewport {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+    }
+
+    .slide-container {
+      width: 100%;
+      max-width: 1200px;
+      aspect-ratio: 16 / 9;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-card);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      display: none;
+      flex-direction: column;
+      padding: 44px 52px;
+      position: relative;
+      overflow: hidden;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .slide-container.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Decorative slide elements */
+    .slide-category {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--primary-orange);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .slide-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .slide-divider {
+      height: 1px;
+      background: linear-gradient(90deg, var(--border-card) 0%, rgba(38, 59, 90, 0) 100%);
+      margin-bottom: 24px;
+    }
+
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    /* Content Cards Grid */
+    .grid-2x2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .grid-3-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+
+    .grid-4-col {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card.border-orange { border-color: rgba(234, 88, 12, 0.4); }
+    .card.border-cyan { border-color: rgba(6, 182, 212, 0.4); }
+    .card.border-emerald { border-color: rgba(16, 185, 129, 0.4); }
+    .card.border-amber { border-color: rgba(245, 158, 11, 0.4); }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .card-list {
+      list-style: none;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .card-list li::before {
+      content: "•";
+      color: var(--accent-cyan);
+      font-weight: bold;
+      display: inline-block;
+      width: 1em;
+    }
+
+    /* Formulas & Code snippets */
+    .formula-box {
+      background: #091322;
+      border: 1px solid #1c3352;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin: 6px 0;
+    }
+
+    /* Badges & Tables */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    /* Title Slide Specifics */
+    .title-slide {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-left: 70px;
+    }
+
+    .title-brand-tag {
+      color: var(--primary-orange);
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+    }
+
+    .title-main {
+      font-size: 3.2rem;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1.1;
+      margin: 10px 0 16px;
+    }
+
+    .title-desc {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 820px;
+      line-height: 1.5;
+    }
+
+    .title-meta-pills {
+      display: flex;
+      gap: 12px;
+      margin-top: 36px;
+    }
+
+    .pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    /* Footer Slide Indicators */
+    .slide-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    /* Key hint */
+    .key-hint {
+      position: fixed;
+      bottom: 12px;
+      right: 20px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      display: flex;
+      gap: 8px;
+    }
+
+    .key-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    @media print {
+      body {
+        overflow: visible;
+        background: #ffffff;
+      }
+      .deck-header, .key-hint { display: none; }
+      .slide-container {
+        display: flex !important;
+        page-break-after: always;
+        border: none;
+        box-shadow: none;
+        max-width: 100%;
+        height: 100vh;
+        aspect-ratio: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header Navigation -->
+  <header class="deck-header">
+    <div class="brand-meta">
+      <img src="assets/logoICON.jpeg" alt="Logo" class="brand-logo" onerror="this.style.display='none'">
+      <div class="brand-title">NAMMA <span>LORRY</span></div>
+      <div class="brand-badge">Architecture Blueprint</div>
+    </div>
+
+    <div class="deck-controls">
+      <button class="nav-btn" id="btnPrev" title="Previous Slide (← / PageUp)">◀ Prev</button>
+      <div class="slide-counter" id="slideCounter">01 / 14</div>
+      <button class="nav-btn" id="btnNext" title="Next Slide (→ / Space / PageDown)">Next ▶</button>
+      <button class="nav-btn" id="btnFullscreen" title="Toggle Fullscreen (F)">⛶ Fullscreen</button>
+      <button class="nav-btn" id="btnPptxDownload" title="Open or save PPTX file">📥 Open .PPTX</button>
+    </div>
+  </header>
+
+  <!-- Viewport -->
+  <main class="deck-viewport">
+
+    <!-- SLIDE 1: TITLE SLIDE -->
+    <div class="slide-container active" data-slide="1">
+      <div class="slide-body title-slide">
+        <div class="title-brand-tag">NAMMA LORRY PLATFORM</div>
+        <h1 class="title-main">Driver GPS & Distance<br>Tracking System</h1>
+        <p class="title-desc">
+          Complete Technical Implementation Blueprint: High-Resilience Offline-First Telemetry, 3-Stage Mathematical Quality Filtering & Multi-Model Distance Arbitration.
+        </p>
+        <div class="title-meta-pills">
+          <div class="pill">📌 Version 1.0.0 Production</div>
+          <div class="pill">₹0 Infrastructure Cost</div>
+          <div class="pill">Specification: gps.docx & DESIGN.md</div>
+          <div class="pill">Heavy Freight Telemetry</div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 1 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: THE FREIGHT MILEAGE DILEMMA -->
+    <div class="slide-container" data-slide="2">
+      <div class="slide-category">Executive Summary & Operational Reality</div>
+      <h2 class="slide-title">The Freight Mileage Dilemma in India</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-4-col">
+          <div class="card border-orange">
+            <div class="card-title">1. Rural Dropouts</div>
+            <div class="card-text">Cellular coverage drops across ghat sections, transport nagars, and remote national highways. Cloud-dependent systems stop logging, resulting in unbilled kilometers.</div>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title">2. Sensor Noise</div>
+            <div class="card-text">Flyovers and massive metallic container bodies cause satellite multipath reflections, creating 2 km teleports in 5 seconds and inflating distances by 15% to 40%.</div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">3. Rigid Baselines</div>
+            <div class="card-text">Fixed corridor tables (e.g. Chennai-Bangalore = 350 km) ignore outer ring bypasses, loading hub detours, and diversions, sparking driver-operator friction.</div>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">4. Prohibitive Costs</div>
+            <div class="card-text">AIS-140 hardware and commercial routing APIs (Google Maps) impose heavy recurring monthly fees that squeeze thin freight margins.</div>
+          </div>
+        </div>
+        <div class="card border-emerald" style="margin-top: 14px;">
+          <div class="card-title" style="color: var(--accent-emerald);">THE NAMMA LORRY SOLUTION: 100% Offline Tracking + Mathematical Guard at ₹0 Cost</div>
+          <div class="card-text">Combines commodity Android phone GNSS sensors, client-side anomaly filtering, local offline queuing, and multi-model arbitration across OpenStreetMap/OSRM and Supabase.</div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 2 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: SYSTEM ARCHITECTURE -->
+    <div class="slide-container" data-slide="3">
+      <div class="slide-category">System Architecture & Pipeline</div>
+      <h2 class="slide-title">End-to-End Telemetry Pipeline</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-3-col">
+          <div class="card border-cyan">
+            <div class="card-title">1. GNSS Satellites Fix</div>
+            <div class="card-text">Hardware GPS streams raw coordinates (Lat, Lng, Accuracy, Speed, Heading, Timestamp) without requiring mobile data.</div>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">2. 3-Stage Quality Guard</div>
+            <div class="card-text">Client-side mathematical filtering eliminates accuracy errors &gt; 50m, speeds &gt; 120 km/h, and 3-point multipath detour spikes.</div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">3. Offline Storage Queue</div>
+            <div class="card-text">Points are stamped with sync_status: pending and queued in LocalStorage / IndexedDB during network blackouts.</div>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title">4. Supabase Cloud Sync</div>
+            <div class="card-text">Upon reconnection, pending batches sync to Supabase with idempotent upserts, guaranteeing zero duplicate entries.</div>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">5. Multi-Model Distance</div>
+            <div class="card-text">Evaluates Model A (Baseline/1.25x), Model B (Filtered GPS Haversine), and Model C (OSRM Road Network).</div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">6. Cockpit & Fleet Map</div>
+            <div class="card-text">Real-time driver HUD, animated lorry markers, trip audit breakdown, daily stats, and admin fleet surveillance.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 3 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: TECHNOLOGY STACK -->
+    <div class="slide-container" data-slide="4">
+      <div class="slide-category">Zero-Cost Ecosystem</div>
+      <h2 class="slide-title">Free &amp; Open-Source Technology Stack</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-2x2">
+          <div class="card">
+            <div class="card-title" style="color: var(--accent-cyan);">Frontend UI &amp; Design System</div>
+            <ul class="card-list">
+              <li>Vanilla ES6+ JavaScript: Zero bundle overhead, instant load times</li>
+              <li>Semantic HTML5 &amp; Vanilla CSS3: Industrial Logistics Tokens</li>
+              <li>Tabular Numerics: font-variant-numeric: tabular-nums prevents jitter</li>
+              <li>100% Free &amp; Open</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--primary-orange);">Mapping &amp; Routing Engine</div>
+            <ul class="card-list">
+              <li>Leaflet.js v1.9.4: Touch-optimized, lightweight map rendering</li>
+              <li>OpenStreetMap Carto: Street-level cartography tiles</li>
+              <li>OSRM (Open Source Routing Machine): Road geometry snapping</li>
+              <li>100% Free &amp; Open Source</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--accent-emerald);">Cloud Database &amp; PostGIS</div>
+            <ul class="card-list">
+              <li>Supabase (PostgreSQL 15+): Managed relational backend</li>
+              <li>PostGIS Extension: Spatial coordinate math &amp; geometry</li>
+              <li>Supabase Realtime: Live driver position streaming</li>
+              <li>Free Tier (500MB DB, 50,000 MAU)</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-title" style="color: var(--accent-amber);">Security &amp; Edge Hosting</div>
+            <ul class="card-list">
+              <li>Row-Level Security (RLS): Strict tenant data privacy</li>
+              <li>Vercel Edge Platform: Global CDN with automatic HTTPS SSL</li>
+              <li>HTML5 Geolocation API: High-accuracy hardware GNSS</li>
+              <li>Total Monthly Infrastructure Cost: ₹0 / month</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 4 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: DATABASE ARCHITECTURE -->
+    <div class="slide-container" data-slide="5">
+      <div class="slide-category">Data Modeling &amp; Persistence</div>
+      <h2 class="slide-title">Database Architecture &amp; PostGIS Schema</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-4-col">
+          <div class="card border-cyan">
+            <div class="card-title">drivers</div>
+            <ul class="card-list">
+              <li>id (TEXT PK)</li>
+              <li>name (TEXT)</li>
+              <li>phone (TEXT)</li>
+              <li>email (TEXT)</li>
+              <li>status ('active'|'idle')</li>
+              <li>created_at (TIMESTAMPTZ)</li>
+            </ul>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">vehicles</div>
+            <ul class="card-list">
+              <li>id (TEXT PK)</li>
+              <li>driver_id (FK)</li>
+              <li>vehicle_number</li>
+              <li>vehicle_type</li>
+              <li>capacity ('25 Ton')</li>
+              <li>status ('on_road')</li>
+            </ul>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">trips</div>
+            <ul class="card-list">
+              <li>id (TEXT PK)</li>
+              <li>driver_id, vehicle_id</li>
+              <li>start/end_location</li>
+              <li>started_at, ended_at</li>
+              <li>distance_km (NUMERIC)</li>
+              <li>calculation_method</li>
+            </ul>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">driver_locations</div>
+            <ul class="card-list">
+              <li>id (TEXT PK)</li>
+              <li>trip_id, driver_id</li>
+              <li>latitude, longitude</li>
+              <li>accuracy, speed</li>
+              <li>heading, recorded_at</li>
+              <li>Index: (trip_id, recorded_at)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card border-emerald" style="margin-top: 14px;">
+          <div class="card-title" style="color: var(--accent-emerald);">Row-Level Security (RLS) &amp; Tenant Isolation</div>
+          <div class="card-text">PostgreSQL RLS policies guarantee Driver A cannot read Driver B's telemetry points or trip logs. Fleet managers have scoped visibility over authorized lorries.</div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 5 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: GPS ACQUISITION -->
+    <div class="slide-container" data-slide="6">
+      <div class="slide-category">Telemetry Ingestion</div>
+      <h2 class="slide-title">Hardware GPS Acquisition &amp; Calibration</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-2x2">
+          <div class="card border-cyan">
+            <div class="card-title">1. HTML5 Geolocation Watcher</div>
+            <div class="card-text">Connects directly to device GNSS chipsets via navigator.geolocation.watchPosition() with enableHighAccuracy: true, maximumAge: 2000ms, and timeout: 12000ms.</div>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">2. Pre-Trip GNSS Locking</div>
+            <div class="card-text">Detects starting coordinates before the lorry rolls. Drivers can click "Lock / Re-acquire Start GPS" to pin warehouse loading bay positions, eliminating false starts.</div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">3. Reverse Geocode Resolution</div>
+            <div class="card-text">Latitude/longitude coordinates are resolved against OpenStreetMap Nominatim into recognizable hub landmarks (e.g. "Sriperumbudur Industrial Corridor").</div>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">4. Real-Time Telemetry Stream</div>
+            <div class="card-text">Every reading extracts Latitude, Longitude, Accuracy (m), Speed (m/s converted to km/h via * 3.6), Heading (0°-360°), and hardware UTC timestamps.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 6 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: GPS QUALITY GUARD -->
+    <div class="slide-container" data-slide="7">
+      <div class="slide-category">Signal Processing &amp; Anomaly Detection</div>
+      <h2 class="slide-title">3-Stage GPS Quality Guard Engine</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-3-col">
+          <div class="card border-cyan">
+            <div class="card-title">Check 1: Accuracy Filter</div>
+            <div class="formula-box">accuracy &le; 50.0 meters</div>
+            <div class="card-text">Cell-tower triangulation generates 300m - 1500m error margins. Any point with error &gt; 50m is flagged POOR_ACCURACY and purged.</div>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">Check 2: Speed Jump Filter</div>
+            <div class="formula-box">v = (&Delta;d / &Delta;t) * 3.6 &le; 120 km/h</div>
+            <div class="card-text">Computes instantaneous speed between consecutive valid points. Rejects any leap exceeding realistic heavy lorry highway limits (&gt; 120 km/h).</div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">Check 3: 3-Point Spike Filter</div>
+            <div class="formula-box">Detour &gt; 2.2x &amp; &Delta;d &gt; 400m</div>
+            <div class="card-text">Evaluates sliding triplets (P_i-1 &rarr; P_i &rarr; P_i+1). Drops transient satellite multipath reflections under highway flyovers.</div>
+          </div>
+        </div>
+        <div class="card border-cyan" style="margin-top: 14px;">
+          <div class="card-title" style="color: var(--accent-cyan);">Battery Optimization &amp; Adaptive Sampling (Section 10)</div>
+          <div class="card-text">Dynamic interval switching: 30s when stationary (&lt; 5 km/h) &bull; 10s in city traffic (5-50 km/h) &bull; 5s at highway cruising speed (&gt; 50 km/h). Conserves smartphone battery over 12-hour hauls.</div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 7 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: MULTI-MODEL DISTANCE -->
+    <div class="slide-container" data-slide="8">
+      <div class="slide-category">Distance Calculation</div>
+      <h2 class="slide-title">Multi-Model Distance Engine (A / B / C)</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-3-col">
+          <div class="card border-orange">
+            <div class="card-title" style="color: var(--primary-orange);">MODEL A: Known Baseline</div>
+            <div class="card-text">
+              <strong>Corridor Catalog:</strong><br>
+              • Chennai &harr; Bengaluru: 348.5 KM<br>
+              • Chennai &harr; Sriperumbudur: 42.0 KM<br>
+              • Chennai &harr; Vellore: 138.0 KM<br><br>
+              <strong>Road Factor Fallback:</strong><br>
+              Multiplies straight-line displacement by 1.25x winding factor.<br><br>
+              <em>Emergency fallback only.</em>
+            </div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title" style="color: var(--accent-emerald);">MODEL B: Filtered Haversine</div>
+            <div class="card-text">
+              <strong>100% Offline Geodesic:</strong><br>
+              Accumulates spherical distance between consecutive cleaned GPS coordinates:<br>
+              <div class="formula-box">d = &Sigma; Haversine(P_i, P_i+1)</div>
+              Earth radius R = 6,371 km.<br><br>
+              Reflects actual route taken, bypasses, and loading bay diversions.
+            </div>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title" style="color: var(--accent-cyan);">MODEL C: OSM / OSRM</div>
+            <div class="card-text">
+              <strong>Road Snapped Distance:</strong><br>
+              Queries OpenStreetMap OSRM routing engine with true start and stop coordinates.<br><br>
+              Direct Start-to-End road routing prevents intermediate waypoint U-turn anomalies across divided highways and medians.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 8 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: ALGORITHMIC ARBITER -->
+    <div class="slide-container" data-slide="9">
+      <div class="slide-category">Audit &amp; Reconciliation</div>
+      <h2 class="slide-title">Algorithmic Arbiter &amp; Decision Matrix</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-2x2">
+          <div class="card border-emerald">
+            <div class="card-title">1. Stationary Vehicle Lock (0.0 KM)</div>
+            <div class="card-text">If origin and stop coordinates have displacement &lt; 60m and total distance &lt; 80m, the trip locks to 0.0 KM. Prevents billing for stationary depot idling.</div>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title">2. Physical Boundary Verification</div>
+            <div class="card-text">Both Model B (GPS) and Model C (OSRM) must be &ge; 0.85 * straight-line displacement. A road trajectory cannot physically be shorter than a straight line.</div>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">3. Outlier Detour Rejection</div>
+            <div class="card-text">If OSRM generates extreme detours (Model C &gt; 2.8 * displacement), it is rejected as a highway median turnaround artifact in favor of verified driver GPS trajectory.</div>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">4. Model Selection Hierarchy</div>
+            <div class="card-text">
+              • Both Agree (&le; 35% diff) &rarr; <strong>Model B (Road Confirmed)</strong><br>
+              • GPS Truncated &rarr; <strong>Model C (OSRM Road Network)</strong><br>
+              • OSRM Offline &rarr; <strong>Model B (GPS Filtered)</strong><br>
+              • Both Inconclusive &rarr; <strong>Model A (Fallback)</strong> or <strong>NEEDS_REVIEW</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 9 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: OFFLINE-FIRST RESILIENCE -->
+    <div class="slide-container" data-slide="10">
+      <div class="slide-category">Resilience &amp; Reliability</div>
+      <h2 class="slide-title">Offline-First Resilience &amp; Zero-Duplicate Sync</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-2x2">
+          <div class="card border-orange">
+            <div class="card-title">Offline Point Capture</div>
+            <div class="card-text">When cellular network drops (isOnline = false), GPS tracking continues uninterrupted. Points are tagged with sync_status: 'pending' and appended to local storage.</div>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title">Realtime Network Listener</div>
+            <div class="card-text">Listens for browser online and offline events. Includes a manual simulation toggle in the header for QA verification and driver demonstration.</div>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">Atomic Batch Upload</div>
+            <div class="card-text">When connection is restored, pending points are uploaded in atomic batches of 50. Mutex promise locking prevents concurrent sync race conditions.</div>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">Idempotent Upsert Deduplication</div>
+            <div class="card-text">Supabase receives points via upsert with onConflict: 'id', ignoreDuplicates: true. Guarantees 0 duplicate records in the cloud database.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 10 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 11: DRIVER MOBILE COCKPIT -->
+    <div class="slide-container" data-slide="11">
+      <div class="slide-category">User Experience &amp; HUD</div>
+      <h2 class="slide-title">Driver Mobile Cockpit &amp; Visual HUD</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-2x2">
+          <div class="card border-orange">
+            <div class="card-title">Live Telemetry HUD Tiles</div>
+            <ul class="card-list">
+              <li>Speedometer (km/h) with tabular numerals to eliminate display jitter</li>
+              <li>Trip Distance (KM) accumulating in high-visibility Highway Orange</li>
+              <li>Trip Duration Timer (hh:mm:ss)</li>
+              <li>GNSS Accuracy Indicator (±m precision radius)</li>
+            </ul>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title">Interactive Leaflet Map</div>
+            <ul class="card-list">
+              <li>Custom animated lorry pin with dynamic bearing rotation</li>
+              <li>Green Polyline: Valid driver GPS trajectory</li>
+              <li>Cyan Polyline: Snapped OSRM road route</li>
+              <li>Red Dots: Rejected noise anomalies</li>
+            </ul>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">Dynamic Journey Cards</div>
+            <ul class="card-list">
+              <li>Real Start Location: GPS coordinates &amp; reverse geocoded depot</li>
+              <li>Stopping Point: Automatically captured upon pressing Stop Trip</li>
+              <li>Lock Start GPS Button: Calibration before vehicle rollout</li>
+            </ul>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">Trip Audit Summary Modal</div>
+            <ul class="card-list">
+              <li>Deep multi-model comparison table (Model A vs B vs C)</li>
+              <li>Points Captured vs Points Filtered quality score</li>
+              <li>Algorithmic justification rationale for transport supervisors</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 11 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 12: DRIVER ANALYTICS & FLEET COMMAND -->
+    <div class="slide-container" data-slide="12">
+      <div class="slide-category">Operational Intelligence</div>
+      <h2 class="slide-title">Driver Analytics &amp; Admin Fleet Command</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-2x2">
+          <div class="card border-cyan">
+            <div class="card-title">Driver KPI Metrics</div>
+            <ul class="card-list">
+              <li>Today's Total Distance (KM)</li>
+              <li>Trips Completed Today</li>
+              <li>Total Active Duty Driving Hours</li>
+              <li>Current Month Accumulated Distance</li>
+              <li>Derived purely from authentic completed trips</li>
+            </ul>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title">Weekly Mon-Sun Distance Chart</div>
+            <ul class="card-list">
+              <li>Interactive 7-day bar chart visualization</li>
+              <li>Daily kilometer distribution from Monday to Sunday</li>
+              <li>Dynamic bar fill height calculations with hover tooltips</li>
+              <li>Live weekly total distance counter</li>
+            </ul>
+          </div>
+          <div class="card border-emerald">
+            <div class="card-title">Admin Fleet Map Surveillance</div>
+            <ul class="card-list">
+              <li>Live multi-lorry tracking across Tamil Nadu &amp; Karnataka corridors</li>
+              <li>Vehicle status badges: Available, On Road, Maintenance</li>
+              <li>Payload capacity details (e.g. 25 Ton Truck, 32 Ton Multi-Axle)</li>
+              <li>Active driver assignment and lorry plate numbers</li>
+            </ul>
+          </div>
+          <div class="card border-amber">
+            <div class="card-title">Supabase Realtime CDC (Section 27)</div>
+            <ul class="card-list">
+              <li>PostgreSQL Realtime WebSocket streaming</li>
+              <li>Updates lorry positions on the Fleet Map without page refresh</li>
+              <li>Instant operational visibility for transport coordinators</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 12 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 13: AUTOMATED TEST SUITE -->
+    <div class="slide-container" data-slide="13">
+      <div class="slide-category">Verification &amp; Quality Assurance</div>
+      <h2 class="slide-title">Automated Test Suite (Section 31 Testing Plan)</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="card" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 18px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px;">Test 1: Internet ON</div>
+              <div class="card-text">Verifies live GPS ingestion, Model B Haversine distance, OSRM road matching, and immediate cloud sync.</div>
+            </div>
+            <span class="badge badge-success">✓ PASSED</span>
+          </div>
+
+          <div class="card" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 18px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px;">Test 2: Internet OFF</div>
+              <div class="card-text">Verifies network disconnection, continuous tracking, and local queue persistence with sync_status: pending.</div>
+            </div>
+            <span class="badge badge-success">✓ PASSED</span>
+          </div>
+
+          <div class="card" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 18px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px;">Test 3: Reconnection Sync</div>
+              <div class="card-text">Verifies pending points flush to Supabase, offline queue clears to 0, and 0 duplicate IDs exist.</div>
+            </div>
+            <span class="badge badge-success">✓ PASSED</span>
+          </div>
+
+          <div class="card" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 18px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px;">Test 4: GPS Jump Simulation</div>
+              <div class="card-text">Injects 85m accuracy error and 1584 km/h leap. Confirms Check 1 &amp; Check 2 reject both anomalies.</div>
+            </div>
+            <span class="badge badge-success">✓ PASSED</span>
+          </div>
+
+          <div class="card" style="flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 18px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px;">Test 5: Adaptive Interval</div>
+              <div class="card-text">Validates dynamic sampling scaling across stationary (30s), city (10s), and highway cruising speeds (5s).</div>
+            </div>
+            <span class="badge badge-success">✓ PASSED</span>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 13 of 14</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 14: SCALABILITY & ROADMAP -->
+    <div class="slide-container" data-slide="14">
+      <div class="slide-category">Production Readiness &amp; Growth</div>
+      <h2 class="slide-title">Production Scaling Roadmap &amp; Next Milestones</h2>
+      <div class="slide-divider"></div>
+      <div class="slide-body">
+        <div class="grid-3-col">
+          <div class="card border-emerald">
+            <div class="card-title" style="color: var(--accent-emerald);">STAGE 1: Zero-Cost MVP</div>
+            <div class="card-text">
+              • Fleet: 1 - 100 Trucks<br>
+              • DB: Supabase Free Tier<br>
+              • Routing: Public OSRM API<br>
+              • Hosting: Vercel Free Edge CDN<br>
+              • Cost: <strong>₹0 / month</strong>
+            </div>
+          </div>
+          <div class="card border-cyan">
+            <div class="card-title" style="color: var(--accent-cyan);">STAGE 2: Regional Fleet</div>
+            <div class="card-text">
+              • Fleet: 100 - 1,000 Trucks<br>
+              • DB: Supabase Pro ($25/mo) with monthly table partitioning<br>
+              • Routing: Self-hosted OSRM ($15/mo)<br>
+              • Cost: <strong>~$40 / month</strong>
+            </div>
+          </div>
+          <div class="card border-orange">
+            <div class="card-title" style="color: var(--primary-orange);">STAGE 3: Enterprise</div>
+            <div class="card-text">
+              • Fleet: 1,000 - 10,000+ Trucks<br>
+              • DB: TimescaleDB / RDS Cluster<br>
+              • Routing: Multi-Region OSRM Cluster<br>
+              • Cost: <strong>~$250 / month</strong>
+            </div>
+          </div>
+        </div>
+        <div class="card border-amber" style="margin-top: 14px;">
+          <div class="card-title" style="color: var(--accent-amber);">Immediate Production Integrations</div>
+          <div class="card-text">
+            <strong>1. PWA Service Worker:</strong> Full asset caching for cold-boot in zero-connectivity areas.<br>
+            <strong>2. Background Geolocation:</strong> Native Capacitor/Flutter wrapper for tracking when phone screen is locked.<br>
+            <strong>3. FASTag &amp; E-Way Bill Cross-Referencing:</strong> Automatic toll plaza timestamp verification against GPS traces.<br>
+            <strong>4. Driver Safety Scoring:</strong> Idling analysis, harsh braking, and speed limit compliance tracking.
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>Namma Lorry Logistics Technology</span>
+        <span>Slide 14 of 14</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Keyboard Shortcuts Hint -->
+  <div class="key-hint">
+    <span>Navigate: <span class="key-box">←</span> <span class="key-box">→</span> or <span class="key-box">Space</span></span>
+    <span>Fullscreen: <span class="key-box">F</span></span>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide-container');
+    const totalSlides = slides.length;
+    let currentSlide = 1;
+
+    const counterEl = document.getElementById('slideCounter');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+    const btnPptxDownload = document.getElementById('btnPptxDownload');
+
+    function showSlide(index) {
+      if (index < 1) index = 1;
+      if (index > totalSlides) index = totalSlides;
+      currentSlide = index;
+
+      slides.forEach((s) => {
+        const slideNum = parseInt(s.getAttribute('data-slide'), 10);
+        if (slideNum === currentSlide) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+
+      counterEl.textContent = `${String(currentSlide).padStart(2, '0')} / ${String(totalSlides).padStart(2, '0')}`;
+      btnPrev.disabled = (currentSlide === 1);
+      btnNext.disabled = (currentSlide === totalSlides);
+    }
+
+    btnPrev.addEventListener('click', () => showSlide(currentSlide - 1));
+    btnNext.addEventListener('click', () => showSlide(currentSlide + 1));
+
+    // Keyboard Navigation
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        showSlide(currentSlide + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        showSlide(currentSlide - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        showSlide(1);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        showSlide(totalSlides);
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      }
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    btnPptxDownload.addEventListener('click', () => {
+      window.location.href = 'Namma_Lorry_GPS_Implementation.pptx';
+    });
+
+    // Initial state
+    showSlide(1);
+  </script>
+</body>
+</html>
