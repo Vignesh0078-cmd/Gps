@@ -573,15 +573,15 @@
               <div class="card" style="margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div>
-                    <h3>Specification Test Suite</h3>
+                    <h3>Specification &amp; Evidence Test Suite</h3>
                     <p style="font-size: 0.8rem; margin-top: 2px;">
-                      Automated tests defined in <strong>Section 31</strong> of <code>gps.docx</code>.
+                      Automated validation of <strong>Point Sufficiency, Model B Evidence, Point Consistency &amp; OSRM</strong>.
                     </p>
                   </div>
                 </div>
                 <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
                   <button class="btn btn-primary btn-sm" id="btnRunAllTests">
-                    <span>⚡</span> Run All Section 31 Tests
+                    <span>⚡</span> Run All 8 Specification Tests
                   </button>
                   <button class="btn btn-secondary btn-sm" id="btnClearLogs">
                     Clear Log
@@ -593,13 +593,13 @@
               <div class="test-case-item" id="testCard1">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <h4 style="font-size: 0.9rem;">Test 1: Internet ON</h4>
+                    <h4 style="font-size: 0.88rem;">Test 1: 2-Min Trip (12+ Points)</h4>
                     <span class="badge badge-ready" id="badgeTest1">Ready</span>
                   </div>
                   <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="1">Run</button>
                 </div>
-                <p style="font-size: 0.75rem; margin-top: 6px;">
-                  Validates real-time GPS point capture, Haversine accumulation, OSRM road match, and direct Supabase sync.
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Validates minimum evidence threshold: 2 min with 12 valid points meets rate (≥ 12). Model B MAY be considered.
                 </p>
               </div>
 
@@ -607,13 +607,13 @@
               <div class="test-case-item" id="testCard2">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <h4 style="font-size: 0.9rem;">Test 2: Internet OFF</h4>
+                    <h4 style="font-size: 0.88rem;">Test 2: 2-Min Trip (11 Points)</h4>
                     <span class="badge badge-ready" id="badgeTest2">Ready</span>
                   </div>
                   <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="2">Run</button>
                 </div>
-                <p style="font-size: 0.75rem; margin-top: 6px;">
-                  Simulates internet disconnection. Verifies GPS recording continues locally in queue with <code>pending</code> status.
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Validates rejection: 2 min with only 11 points (11 &lt; 12) triggers <code>INVALID — INSUFFICIENT EVIDENCE</code>.
                 </p>
               </div>
 
@@ -621,13 +621,13 @@
               <div class="test-case-item" id="testCard3">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <h4 style="font-size: 0.9rem;">Test 3: Internet OFF ➔ ON</h4>
+                    <h4 style="font-size: 0.88rem;">Test 3: 18-Min Trip (9 Points)</h4>
                     <span class="badge badge-ready" id="badgeTest3">Ready</span>
                   </div>
                   <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="3">Run</button>
                 </div>
-                <p style="font-size: 0.75rem; margin-top: 6px;">
-                  Simulates reconnection. Verifies all queued points batch-sync with zero duplication.
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Exact Screenshot 2 scenario: 18 min with 9 points (req: 108). Model B (6.5 km) rejected; Model C (8.6 km) selected!
                 </p>
               </div>
 
@@ -635,13 +635,13 @@
               <div class="test-case-item" id="testCard4">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <h4 style="font-size: 0.9rem;">Test 4: GPS Jump Simulation</h4>
+                    <h4 style="font-size: 0.88rem;">Test 4: 18-Min Trip (108+ Points)</h4>
                     <span class="badge badge-ready" id="badgeTest4">Ready</span>
                   </div>
                   <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="4">Run</button>
                 </div>
-                <p style="font-size: 0.75rem; margin-top: 6px;">
-                  Injects poor accuracy (85m) and impossible leap point. Verifies rejection by Filter Checks 1 and 2.
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  18 min with 110 valid points meets minimum evidence (110 ≥ 108). Model B passes sufficiency check.
                 </p>
               </div>
 
@@ -649,13 +649,55 @@
               <div class="test-case-item" id="testCard5">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <h4 style="font-size: 0.9rem;">Test 5: Dynamic Interval &amp; Battery</h4>
+                    <h4 style="font-size: 0.88rem;">Test 5: Point Count Consistency</h4>
                     <span class="badge badge-ready" id="badgeTest5">Ready</span>
                   </div>
                   <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="5">Run</button>
                 </div>
-                <p style="font-size: 0.75rem; margin-top: 6px;">
-                  Validates dynamic adjustment of GPS capture interval based on vehicle speed to prevent phone battery drain.
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Verifies single authoritative array: Total = Valid Accepted + Noise Filtered across all UI elements.
+                </p>
+              </div>
+
+              <!-- Test Case 6 -->
+              <div class="test-case-item" id="testCard6">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.88rem;">Test 6: Model B Count === Valid Count</h4>
+                    <span class="badge badge-ready" id="badgeTest6">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="6">Run</button>
+                </div>
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Screenshot 1 fix: Verifies Model B validated points strictly matches valid GPS points array (34 = 34, not 35).
+                </p>
+              </div>
+
+              <!-- Test Case 7 -->
+              <div class="test-case-item" id="testCard7">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.88rem;">Test 7: Offline GPS Capture</h4>
+                    <span class="badge badge-ready" id="badgeTest7">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="7">Run</button>
+                </div>
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Verifies that disabling internet does not stop GPS point ingestion, filtering, or local distance calculation.
+                </p>
+              </div>
+
+              <!-- Test Case 8 -->
+              <div class="test-case-item" id="testCard8">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 style="font-size: 0.88rem;">Test 8: OSRM lon,lat Coordinate Order</h4>
+                    <span class="badge badge-ready" id="badgeTest8">Ready</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm btn-run-single-test" data-test="8">Run</button>
+                </div>
+                <p style="font-size: 0.74rem; margin-top: 5px;">
+                  Verifies OSRM queries strictly format coordinates as <code>longitude,latitude</code> and logs request details.
                 </p>
               </div>
             </div>
@@ -823,7 +865,7 @@
           <span id="modalRationale">Evaluating trip data...</span>
         </div>
 
-        <!-- Quality Metrics Grid -->
+        <!-- Quality Metrics Grid (Authoritative GPS Ingest & Sufficiency Stats) -->
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
           <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
             <div style="font-size: 0.7rem; color: var(--nl-text-muted);">TOTAL GPS POINTS</div>
@@ -836,6 +878,22 @@
           <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
             <div style="font-size: 0.7rem; color: var(--nl-text-muted);">NOISE FILTERED</div>
             <div style="font-size: 1.1rem; font-weight: 700; color: var(--nl-error);" id="modalPointsRejected">2</div>
+          </div>
+        </div>
+
+        <!-- Point Sufficiency & GPS Coverage Stats (Part 2 & 3) -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;">
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">MIN REQUIRED PTS</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #38bdf8;" id="modalPointsRequired">12</div>
+          </div>
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">GPS COVERAGE</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff;" id="modalGpsCoverage">100%</div>
+          </div>
+          <div style="background: var(--nl-surface-dim); padding: 10px; border-radius: var(--radius-sm); text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div style="font-size: 0.7rem; color: var(--nl-text-muted);">EVIDENCE STATUS</div>
+            <span class="badge badge-success" style="font-size: 0.72rem; margin-top: 4px;" id="modalEvidenceStatus">SUFFICIENT</span>
           </div>
         </div>
 

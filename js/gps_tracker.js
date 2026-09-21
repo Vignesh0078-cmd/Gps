@@ -36,8 +36,34 @@ class GPSTracker {
     this.simulationStepIndex = 0;
     this.simulationTimerId = null;
     this.deviceWatchId = null;
+    this.wakeLock = null;
+    this.heartbeatIntervalId = null;
+    this.lastPositionTimestamp = null;
 
     this.listeners = [];
+  }
+
+  async requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        console.log('[GPSTracker] Screen WakeLock acquired (prevents mobile OS GPS throttling).');
+        this.wakeLock.addEventListener('release', () => {
+          console.log('[GPSTracker] Screen WakeLock was released.');
+        });
+      } catch (err) {
+        console.warn('[GPSTracker] WakeLock request error:', err.message);
+      }
+    }
+  }
+
+  releaseWakeLock() {
+    if (this.wakeLock) {
+      try {
+        this.wakeLock.release();
+        this.wakeLock = null;
+      } catch (e) {}
+    }
   }
 
   onUpdate(callback) {
@@ -146,7 +172,10 @@ class GPSTracker {
     }, 1000);
 
     if (this.trackingMode === 'device') {
-      // 1. If pre-trip location was already acquired with good accuracy, lock it immediately!
+      this.requestWakeLock();
+
+      // 1. If pre-trip location was already acquired with good accuracy, ingest it immediately!
+      // All points MUST enter through ingestLocationPoint to ensure rawPoints.length === cleanedPoints.length + rejectedPoints.length
       if (this.preTripLocation) {
         const startPt = {
           latitude: this.preTripLocation.latitude,
@@ -157,26 +186,15 @@ class GPSTracker {
           recorded_at: new Date().toISOString(),
           trip_id: this.activeTripId
         };
-        this.startPoint = startPt;
         this.startPointAddress = this.preTripLocation.address || 'Start Location (GPS Fixed)';
-        this.cleanedPoints.push(startPt);
-        if (window.nlMapManager) {
-          window.nlMapManager.setStartMarker(startPt);
-          window.nlMapManager.centerOn(startPt.latitude, startPt.longitude);
-        }
-        this.notify({
-          type: 'start_location_locked',
-          point: startPt,
-          address: this.startPointAddress,
-          accuracyM: Math.round(startPt.accuracy || 8)
-        });
+        this.ingestLocationPoint(startPt);
       }
 
       // 2. Fetch GNSS fix to confirm or lock if preTrip wasn't ready
-      if ('geolocation' in navigator) {
+      if ('geolocation' in navigator && !this.startPoint) {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
-            if (!this.isTracking) return;
+            if (!this.isTracking || this.startPoint) return;
             const pt = {
               latitude: pos.coords.latitude,
               longitude: pos.coords.longitude,
@@ -186,25 +204,10 @@ class GPSTracker {
               recorded_at: new Date(pos.timestamp).toISOString(),
               trip_id: this.activeTripId
             };
-            // Only assign if startPoint was not yet locked
-            if (!this.startPoint) {
-              this.startPoint = pt;
-              this.startPointAddress = await this.resolvePlaceName(pt, 'Start Location');
-              this.cleanedPoints.push(pt);
-              if (window.nlMapManager) {
-                window.nlMapManager.setStartMarker(pt);
-                window.nlMapManager.centerOn(pt.latitude, pt.longitude);
-              }
-              this.notify({
-                type: 'start_location_locked',
-                point: pt,
-                address: this.startPointAddress,
-                accuracyM: Math.round(pt.accuracy)
-              });
-            }
+            this.ingestLocationPoint(pt);
           },
           (err) => console.warn('[GPSTracker] Initial start position warning:', err.message),
-          { enableHighAccuracy: true, timeout: 6000 }
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
         );
       }
       this.startDeviceGPS();
@@ -226,10 +229,15 @@ class GPSTracker {
     this.isTracking = false;
     clearInterval(this.timerIntervalId);
     if (this.simulationTimerId) clearTimeout(this.simulationTimerId);
+    if (this.heartbeatIntervalId) {
+      clearInterval(this.heartbeatIntervalId);
+      this.heartbeatIntervalId = null;
+    }
     if (this.deviceWatchId !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(this.deviceWatchId);
       this.deviceWatchId = null;
     }
+    this.releaseWakeLock();
 
     const tripEndTime = new Date();
     const durationSeconds = Math.max(1, Math.floor((tripEndTime - this.tripStartTime) / 1000));
@@ -314,10 +322,13 @@ class GPSTracker {
 
     const isOnline = this.store.isOnline();
 
-    // Trigger Multi-Model Distance Calculation (Section 22)
+    // Trigger Multi-Model Distance Calculation with point sufficiency and duration
     const calculation = await this.distanceEngine.resolveFinalDistance({
       cleanedPoints: this.cleanedPoints,
       rawPointsCount: this.rawPoints.length,
+      durationSeconds,
+      durationMinutes,
+      configuredInterval: 5,
       origin,
       destination,
       isOnline,
@@ -325,6 +336,45 @@ class GPSTracker {
       startPoint: this.startPoint,
       endPoint: this.endPoint
     });
+
+    // Comprehensive GPS Audit & Consistency Logging (Part 1 requirement)
+    const firstPoint = this.cleanedPoints[0] || this.rawPoints[0];
+    const lastPointRec = this.cleanedPoints[this.cleanedPoints.length - 1] || this.rawPoints[this.rawPoints.length - 1];
+
+    const actualIntervalsSec = [];
+    for (let i = 1; i < this.cleanedPoints.length; i++) {
+      const t1 = new Date(this.cleanedPoints[i - 1].recorded_at).getTime();
+      const t2 = new Date(this.cleanedPoints[i].recorded_at).getTime();
+      actualIntervalsSec.push(Math.round((t2 - t1) / 1000));
+    }
+
+    const gpsAuditLog = {
+      tripId: this.activeTripId,
+      firstGpsTimestamp: firstPoint ? firstPoint.recorded_at : null,
+      lastGpsTimestamp: lastPointRec ? lastPointRec.recorded_at : null,
+      configuredCaptureIntervalSec: 5,
+      actualIntervalsBetweenPointsSec: actualIntervalsSec,
+      totalCapturedPoints: this.rawPoints.length,
+      validPoints: this.cleanedPoints.length,
+      rejectedPoints: this.rejectedPoints.length,
+      rejectionReasons: this.rejectedPoints.map(p => ({
+        pointId: p.id || p.recorded_at,
+        reason: p.filterMetadata?.reason || 'NOISE_FILTERED',
+        message: p.filterMetadata?.message || ''
+      })),
+      modelBPointCount: this.cleanedPoints.length,
+      modelBValid: calculation.breakdown?.modelB?.valid,
+      modelBRejectionReason: calculation.breakdown?.modelB?.rejectionReason,
+      minRequiredPoints: calculation.breakdown?.modelB?.minimumRequiredPoints,
+      expectedPoints: calculation.breakdown?.modelB?.expectedPoints,
+      coveragePercent: calculation.breakdown?.modelB?.coveragePercent,
+      selectedModel: calculation.selectedModel?.modelCode,
+      finalDistanceKm: calculation.finalDistanceKm
+    };
+
+    console.log('====================================================');
+    console.log('[GPS AUDIT & CONSISTENCY LOG]', JSON.stringify(gpsAuditLog, null, 2));
+    console.log('====================================================');
 
     const activeDriver = this.store.getActiveDriver();
     const activeVehicle = this.store.getActiveVehicle();
@@ -373,7 +423,8 @@ class GPSTracker {
   }
 
   /**
-   * Device Geolocation using HTML5 API
+   * Device Geolocation using HTML5 API with Heartbeat Polling
+   * Overcomes mobile background sleep and OS watchPosition throttling.
    */
   startDeviceGPS() {
     if (!('geolocation' in navigator)) {
@@ -385,8 +436,11 @@ class GPSTracker {
       return;
     }
 
+    this.lastPositionTimestamp = Date.now();
+
     this.deviceWatchId = navigator.geolocation.watchPosition(
       (pos) => {
+        this.lastPositionTimestamp = Date.now();
         // Accurately capture speed without falsy fallback
         const hasSpeed = pos.coords.speed !== null && pos.coords.speed !== undefined && !isNaN(pos.coords.speed) && pos.coords.speed >= 0;
         const speedKmH = hasSpeed ? pos.coords.speed * 3.6 : 0;
@@ -414,10 +468,40 @@ class GPSTracker {
       },
       {
         enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 2000
+        timeout: 10000,
+        maximumAge: 0 // Prevent stale cached points
       }
     );
+
+    // Fallback heartbeat poll:
+    // If mobile OS suspends or throttles watchPosition callbacks, actively poll GNSS hardware
+    // every 8 seconds to ensure continuous point capture!
+    this.heartbeatIntervalId = setInterval(() => {
+      if (!this.isTracking || this.trackingMode !== 'device') return;
+      const elapsedSinceLastFix = Date.now() - (this.lastPositionTimestamp || 0);
+      if (elapsedSinceLastFix >= 8000) {
+        console.log(`[GPSTracker Heartbeat] No watch callback for ${Math.round(elapsedSinceLastFix / 1000)}s; polling getCurrentPosition...`);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!this.isTracking) return;
+            this.lastPositionTimestamp = Date.now();
+            const hasSpeed = pos.coords.speed !== null && pos.coords.speed !== undefined && !isNaN(pos.coords.speed) && pos.coords.speed >= 0;
+            const point = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy || 10,
+              speed: hasSpeed ? pos.coords.speed * 3.6 : 0,
+              heading: pos.coords.heading || 0,
+              recorded_at: new Date(pos.timestamp).toISOString(),
+              trip_id: this.activeTripId
+            };
+            this.ingestLocationPoint(point);
+          },
+          (err) => console.warn('[GPSTracker Heartbeat] Poll error:', err.message),
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+        );
+      }
+    }, 5000);
   }
 
   /**
@@ -504,6 +588,7 @@ class GPSTracker {
         this.startPoint = point;
         if (window.nlMapManager) {
           window.nlMapManager.setStartMarker(point);
+          window.nlMapManager.centerOn(point.latitude, point.longitude);
         }
         if (!this.startPointAddress) {
           this.resolvePlaceName(point, 'Start Location').then(addr => {
@@ -514,6 +599,13 @@ class GPSTracker {
               address: addr,
               accuracyM: Math.round(point.accuracy || 8)
             });
+          });
+        } else {
+          this.notify({
+            type: 'start_location_locked',
+            point,
+            address: this.startPointAddress,
+            accuracyM: Math.round(point.accuracy || 8)
           });
         }
       }

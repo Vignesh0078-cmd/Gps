@@ -71,14 +71,18 @@ class DistanceEngine {
         lastPoint.longitude
       );
       if (directKm >= 0.06) {
-        const estHighwayKm = parseFloat((directKm * 1.25).toFixed(1));
+        const roadWindingFactor = 1.25;
+        const estHighwayKm = parseFloat((directKm * roadWindingFactor).toFixed(1));
         return {
           method: 'Model A (Road Factor ×1.25)',
           distanceKm: estHighwayKm,
+          directDistanceKm: parseFloat(directKm.toFixed(2)),
+          roadWindingFactor: roadWindingFactor,
           isCorridorMatch: false,
           valid: true,
           confidence: 'Medium (Road Factor Estimate)',
-          note: `Straight line (${directKm.toFixed(1)} km) × 1.25 road winding factor`
+          formula: `Direct distance (${directKm.toFixed(2)} km) × 1.25 road winding factor = ${estHighwayKm} km`,
+          note: `Direct distance = ${directKm.toFixed(2)} km, Road winding factor = 1.25, Model A = ${estHighwayKm} km`
         };
       }
     }
@@ -95,45 +99,108 @@ class DistanceEngine {
 
   /**
    * MODEL B — GPS Geodesic Distance (Haversine summation over filtered points)
-   * Runs 100% locally and offline without internet
+   * Runs 100% locally and offline without internet.
+   * 
+   * Strict Point Sufficiency & Minimum Evidence Rule:
+   * - Point Validity checks if individual points are physically acceptable.
+   * - Point Sufficiency checks if ENOUGH valid points exist to reconstruct trajectory.
+   * - minimum_required_points = max(12, ceil(duration_minutes * 6))
+   *   (Rate of 6 valid points per minute; min 12 points for 2 minutes).
+   * - If valid points < minimum_required_points, Model B is INVALID (INSUFFICIENT_EVIDENCE).
    */
-  calculateModelB(cleanedPoints) {
-    if (!cleanedPoints || cleanedPoints.length < 2) {
+  calculateModelB(cleanedPoints, durationMinutes = 1, durationSeconds = null, configuredInterval = 5) {
+    const durSec = durationSeconds !== null ? Math.max(1, durationSeconds) : Math.max(1, (durationMinutes || 1) * 60);
+    const durMin = durationMinutes !== null ? Math.max(1, durationMinutes) : Math.max(1, Math.round(durSec / 60));
+    const minimumRequiredPoints = Math.max(12, Math.ceil(durMin * 6));
+    const expectedPoints = Math.max(1, Math.round(durSec / (configuredInterval || 5)));
+    const pointsCount = cleanedPoints ? cleanedPoints.length : 0;
+    const coverageRatio = Math.min(1.0, pointsCount / expectedPoints);
+    const coveragePercent = parseFloat((coverageRatio * 100).toFixed(1));
+
+    // Calculate geodesic distance over available valid points
+    let totalKm = 0.0;
+    if (cleanedPoints && cleanedPoints.length >= 2) {
+      for (let i = 0; i < cleanedPoints.length - 1; i++) {
+        const p1 = cleanedPoints[i];
+        const p2 = cleanedPoints[i + 1];
+        const stepKm = this.haversineKm(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+        totalKm += stepKm;
+      }
+    }
+    const distanceKm = parseFloat(totalKm.toFixed(1));
+
+    // Calculate maximum timestamp gap between consecutive points
+    let maxGapSeconds = 0;
+    if (cleanedPoints && cleanedPoints.length >= 2) {
+      for (let i = 0; i < cleanedPoints.length - 1; i++) {
+        if (cleanedPoints[i].recorded_at && cleanedPoints[i + 1].recorded_at) {
+          const gap = Math.max(0, (new Date(cleanedPoints[i + 1].recorded_at).getTime() - new Date(cleanedPoints[i].recorded_at).getTime()) / 1000);
+          if (gap > maxGapSeconds) maxGapSeconds = gap;
+        }
+      }
+    }
+
+    // Condition 1 & 2: Minimum points & evidence sufficiency threshold
+    if (!cleanedPoints || pointsCount < 2) {
       return {
         method: 'Model B (GPS Filtered)',
         distanceKm: 0.0,
         valid: false,
-        confidence: 'Insufficient Data',
+        isSufficient: false,
+        rejectionReason: 'Insufficient GPS points captured (< 2 points)',
+        confidence: 'LOW / INSUFFICIENT EVIDENCE',
+        pointCount: pointsCount,
+        minimumRequiredPoints,
+        expectedPoints,
+        coverageRatio: 0,
+        coveragePercent: 0,
+        maxGapSeconds,
         note: 'Requires at least 2 valid GPS points'
       };
     }
 
-    let totalKm = 0.0;
-    for (let i = 0; i < cleanedPoints.length - 1; i++) {
-      const p1 = cleanedPoints[i];
-      const p2 = cleanedPoints[i + 1];
-      const stepKm = this.haversineKm(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
-      totalKm += stepKm;
+    if (pointsCount < minimumRequiredPoints) {
+      const rejectionReason = `Insufficient GPS evidence: only ${pointsCount} valid points for an ${durMin}-minute trip (required minimum: ${minimumRequiredPoints} points, coverage: ${coveragePercent}%).`;
+      return {
+        method: 'Model B (GPS Filtered)',
+        distanceKm: distanceKm,
+        valid: false,
+        isSufficient: false,
+        rejectionReason,
+        confidence: 'LOW / INSUFFICIENT EVIDENCE',
+        pointCount: pointsCount,
+        minimumRequiredPoints,
+        expectedPoints,
+        coverageRatio,
+        coveragePercent,
+        maxGapSeconds,
+        note: rejectionReason
+      };
     }
 
+    // Pass: point sufficiency satisfied
     return {
       method: 'Model B (GPS Filtered)',
-      distanceKm: parseFloat(totalKm.toFixed(1)),
+      distanceKm: distanceKm,
       valid: true,
-      confidence: 'High (Geodesic Accumulated)',
-      pointCount: cleanedPoints.length,
-      note: `Calculated from ${cleanedPoints.length} validated GPS points`
+      isSufficient: true,
+      rejectionReason: null,
+      confidence: 'HIGH / GPS VERIFIED',
+      pointCount: pointsCount,
+      minimumRequiredPoints,
+      expectedPoints,
+      coverageRatio,
+      coveragePercent,
+      maxGapSeconds,
+      note: `Calculated from ${pointsCount} validated GPS points (coverage: ${coveragePercent}%)`
     };
   }
 
   /**
    * MODEL C — OpenStreetMap + OSRM Road-Network Routing
-   * Queries public OSRM engine or performs smart road corridor matching
-   */
-  /**
-   * MODEL C — OpenStreetMap + OSRM Road-Network Routing
    * Queries public OSRM engine or performs smart road corridor matching.
    * Direct Start-to-End road routing prevents intermediate waypoint U-turn anomalies.
+   * Coordinate order strictly verified: longitude,latitude
    */
   async calculateModelC(cleanedPoints, isOnline, startPoint, endPoint) {
     const pStart = startPoint || (cleanedPoints && cleanedPoints[0]);
@@ -144,7 +211,8 @@ class DistanceEngine {
         method: 'Model C (OSRM Road Snapping)',
         distanceKm: null,
         available: false,
-        reason: 'INSUFFICIENT_POINTS'
+        reason: 'INSUFFICIENT_POINTS',
+        note: 'Missing start or end coordinate'
       };
     }
 
@@ -159,11 +227,15 @@ class DistanceEngine {
     }
 
     // Direct Origin-to-Destination Road Routing:
-    // Querying the true start and destination coordinates prevents noisy intermediate points
-    // from forcing multi-kilometer U-turns across divided highways and medians.
+    // OSRM strictly requires {longitude},{latitude};{longitude},{latitude}
     const coordStr = `${pStart.longitude.toFixed(5)},${pStart.latitude.toFixed(5)};${pEnd.longitude.toFixed(5)},${pEnd.latitude.toFixed(5)}`;
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
-    console.log(`[DistanceEngine] OSRM Route Request: Coordinates [${coordStr}], URL: ${osrmUrl}`);
+
+    console.log(`[DistanceEngine] OSRM Route Request:
+      URL: ${osrmUrl}
+      Start: [Lat: ${pStart.latitude.toFixed(5)}, Lon: ${pStart.longitude.toFixed(5)}]
+      End:   [Lat: ${pEnd.latitude.toFixed(5)}, Lon: ${pEnd.longitude.toFixed(5)}]
+      Coordinate Order Verified: longitude,latitude`);
 
     try {
       const controller = new AbortController();
@@ -175,19 +247,28 @@ class DistanceEngine {
       if (!res.ok) throw new Error(`OSRM HTTP error ${res.status}`);
       const data = await res.json();
 
+      console.log(`[DistanceEngine] OSRM Route Response:
+        HTTP Status: ${res.status}
+        OSRM Code: ${data.code}
+        Routes Count: ${data.routes?.length || 0}
+        Returned Distance: ${data.routes?.[0]?.distance ? (data.routes[0].distance / 1000).toFixed(2) + ' km' : 'N/A'}
+        Returned Duration: ${data.routes?.[0]?.duration ? Math.round(data.routes[0].duration) + ' sec' : 'N/A'}`);
+
       if (data.routes && data.routes.length > 0) {
         const roadDistanceMeters = data.routes[0].distance;
         const roadDistanceKm = parseFloat((roadDistanceMeters / 1000).toFixed(1));
         const geometry = data.routes[0].geometry; // GeoJSON road polyline
-        console.log(`[DistanceEngine] OSRM Route Success: HTTP ${res.status}, Distance: ${roadDistanceKm} km, Polyline coordinates: ${geometry?.coordinates?.length || 0}`);
 
         return {
           method: 'Model C (OSRM Road Network)',
           distanceKm: roadDistanceKm,
+          durationSec: Math.round(data.routes[0].duration || 0),
           available: true,
-          confidence: 'Very High (OSM Road Snapped)',
+          confidence: 'HIGH / ROAD VERIFIED',
           geometry: geometry,
-          note: `Snapped to actual road network via OpenStreetMap OSRM routing`
+          startCoord: [pStart.latitude, pStart.longitude],
+          endCoord: [pEnd.latitude, pEnd.longitude],
+          note: `Snapped to actual road network via OpenStreetMap OSRM routing (${roadDistanceKm} km)`
         };
       } else {
         console.warn('[DistanceEngine] OSRM returned 0 routes');
@@ -205,42 +286,32 @@ class DistanceEngine {
       distanceKm: estimatedRoadKm,
       available: true,
       confidence: 'High (Road Pattern Interpolated)',
-      note: 'Road network geometry aligned using topological highway matching.'
+      startCoord: [pStart.latitude, pStart.longitude],
+      endCoord: [pEnd.latitude, pEnd.longitude],
+      note: `Road network geometry aligned using topological highway matching (${estimatedRoadKm} km).`
     };
   }
 
   /**
    * Final Model Selection & Quality Arbiter
-   * Evaluates Section 20 decision tree with Physical Validation & Outlier Rejection:
-   * 1. Get actual START and END GPS coordinates.
-   * 2. Calculate:
-   *    - Model B = filtered GPS Haversine accumulated distance.
-   *    - Model C = OSRM road-route distance using the SAME start/end coordinates.
-   *    - Model A = dynamic fallback/baseline only when valid.
-   * 3. Calculate directDistance = straight-line Haversine distance between START and END.
-   * 4. Validate Model B:
-   *    - B must be >= directDistance * 0.85 (GPS path cannot be smaller than straight line).
-   *    - Reject B if significantly smaller than directDistance.
-   *    - Reject B if GPS points contain impossible jumps/speeds.
-   *    - Reject B if GPS coverage is insufficient.
-   * 5. Validate Model C:
-   *    - C must be >= directDistance * 0.85.
-   *    - Reject C if OSRM response is invalid/offline.
-   *    - Reject C if C is an extreme detour outlier (C > directDistance * 2.8).
-   *    - Log OSRM coordinates, response, and route distance.
-   * 6. Model A is NOT a fixed universal distance. Valid only when baseline/displacement exists.
-   * 7. Selection priority:
-   *    - If B is valid and C is valid and reasonably close, use GPS result B.
-   *    - If B is invalid but C is valid, use C.
-   *    - If C is invalid but B is valid, use B.
-   *    - If both are invalid, use A only if A is valid.
-   *    - If no model is valid, mark trip as NEEDS_REVIEW.
-   * 8. Every selected distance must pass validation.
-   * 9. Store and log all metrics for supervisor audit.
+   * Evaluates Section 20 decision tree with Evidence Sufficiency, Physical Validation & Outlier Rejection:
+   * 
+   * STEP 1: Validate GPS points individually (Point Validity: accuracy, speed, jumps).
+   * STEP 2: Check whether there are enough valid GPS points (Point Sufficiency: rate >= 6/min, min 12).
+   * STEP 3: Check GPS coverage ratio and timestamp gaps.
+   * STEP 4: If GPS evidence is insufficient -> Model B = INVALID.
+   * STEP 5: Validate Model C / OSRM (order: lon,lat; not extreme outlier).
+   * STEP 6: Validate Model A (transparent straight line * 1.25).
+   * STEP 7: Compare ONLY the models that passed validation.
+   * STEP 8: Select the most defensible valid model.
+   * STEP 9: If no model has sufficient evidence -> FINAL RESULT = NEEDS_REVIEW (distance 0.0).
    */
   async resolveFinalDistance({
     cleanedPoints = [],
     rawPointsCount = 0,
+    durationSeconds = 60,
+    durationMinutes = null,
+    configuredInterval = 5,
     origin = '',
     destination = '',
     isOnline = true,
@@ -251,13 +322,17 @@ class DistanceEngine {
     const pStart = startPoint || (cleanedPoints && cleanedPoints[0]);
     const pEnd = endPoint || (cleanedPoints && cleanedPoints[cleanedPoints.length - 1]);
 
+    const durSec = durationSeconds !== null ? Math.max(1, durationSeconds) : 60;
+    const durMin = durationMinutes !== null ? Math.max(1, durationMinutes) : Math.max(1, Math.round(durSec / 60));
+
     // 1. Direct Straight-Line Displacement between START and END
     const directDistance = (pStart && pEnd)
       ? this.haversineKm(pStart.latitude, pStart.longitude, pEnd.latitude, pEnd.longitude)
       : 0.0;
 
+    // STEP 1-3: Model Calculations
     const modelA = this.calculateModelA(origin, destination, pStart, pEnd, isDeviceTrip);
-    const modelB = this.calculateModelB(cleanedPoints);
+    const modelB = this.calculateModelB(cleanedPoints, durMin, durSec, configuredInterval);
     const modelC = await this.calculateModelC(cleanedPoints, isOnline, pStart, pEnd);
 
     // 2. Stationary Vehicle Check:
@@ -267,13 +342,13 @@ class DistanceEngine {
         modelCode: 'MODEL_B',
         name: 'Model B (GPS Stationary)',
         distanceKm: 0.0,
-        confidence: 'Verified (Zero Movement)',
+        confidence: 'HIGH / GPS VERIFIED (Stationary)',
         reason: 'Trip started and stopped at the same location. Zero mileage recorded.'
       };
       const decisionLog = {
         directDistance: parseFloat(directDistance.toFixed(2)),
         modelA: { distanceKm: modelA.distanceKm, valid: false, rejectionReason: 'Stationary vehicle' },
-        modelB: { distanceKm: 0.0, valid: true, rejectionReason: null },
+        modelB: { distanceKm: 0.0, valid: true, rejectionReason: null, isSufficient: true },
         modelC: { distanceKm: modelC.distanceKm, valid: false, rejectionReason: 'Stationary vehicle' },
         selectedModel: 'MODEL_B',
         finalDistance: 0.0,
@@ -284,7 +359,7 @@ class DistanceEngine {
       return {
         selectedModel,
         finalDistanceKm: 0.0,
-        confidenceScore: 'Verified (0.0 KM)',
+        confidenceScore: 'HIGH / GPS VERIFIED (0.0 KM)',
         rationale: decisionLog.rationale,
         status: 'VERIFIED',
         directDistance: parseFloat(directDistance.toFixed(2)),
@@ -297,25 +372,29 @@ class DistanceEngine {
       };
     }
 
-    // 3. Validate Model B (GPS Haversine accumulated distance):
-    let gpsValid = true;
-    let gpsRejectionReason = null;
+    // STEP 4: Validate Model B (GPS Haversine accumulated distance):
+    // Model B must pass:
+    // 1. Point sufficiency threshold (minimum_required_points = max(12, durMin * 6))
+    // 2. Point validity
+    // 3. Physical bounds (>= directDistance * 0.85 and <= max(directDistance * 3.5, directDistance + 10))
+    let gpsValid = modelB.valid;
+    let gpsRejectionReason = modelB.rejectionReason;
 
-    if (!modelB.valid || !cleanedPoints || cleanedPoints.length < 2) {
-      gpsValid = false;
-      gpsRejectionReason = 'Insufficient GPS points captured (< 2 points)';
-    } else if (modelB.distanceKm < directDistance * 0.85) {
-      gpsValid = false;
-      gpsRejectionReason = `GPS distance (${modelB.distanceKm} km) is significantly less than straight-line displacement (${directDistance.toFixed(1)} km). Truncated trace or dropped points.`;
-    } else if (modelB.distanceKm > Math.max(directDistance * 3.5, directDistance + 10.0)) {
-      gpsValid = false;
-      gpsRejectionReason = `GPS distance (${modelB.distanceKm} km) exceeds physical bounds for displacement (${directDistance.toFixed(1)} km). Teleportation or multipath noise.`;
-    } else if (directDistance > 1.0 && cleanedPoints.length < 3) {
-      gpsValid = false;
-      gpsRejectionReason = `Insufficient GPS coverage (${cleanedPoints.length} points for ${directDistance.toFixed(1)} km trip).`;
+    if (gpsValid) {
+      if (modelB.distanceKm < directDistance * 0.85) {
+        gpsValid = false;
+        gpsRejectionReason = `GPS distance (${modelB.distanceKm} km) is significantly less than straight-line displacement (${directDistance.toFixed(1)} km). Truncated trace or dropped points.`;
+      } else if (modelB.distanceKm > Math.max(directDistance * 3.5, directDistance + 10.0)) {
+        gpsValid = false;
+        gpsRejectionReason = `GPS distance (${modelB.distanceKm} km) exceeds physical bounds for displacement (${directDistance.toFixed(1)} km). Teleportation or multipath noise.`;
+      } else if (modelB.maxGapSeconds > 180 && directDistance > 1.0) {
+        // Major timestamp gap (> 3 min) during moving trip
+        gpsValid = false;
+        gpsRejectionReason = `Major GPS gap detected (${Math.round(modelB.maxGapSeconds)}s between consecutive points). Trajectory continuity broken.`;
+      }
     }
 
-    // 4. Validate Model C (OSRM Road Network route):
+    // STEP 5: Validate Model C (OSRM Road Network route):
     let osrmValid = true;
     let osrmRejectionReason = null;
 
@@ -330,7 +409,7 @@ class DistanceEngine {
       osrmRejectionReason = `OSRM road distance (${modelC.distanceKm} km) is an extreme detour outlier for ${directDistance.toFixed(1)} km displacement.`;
     }
 
-    // 5. Validate Model A (Dynamic fallback baseline):
+    // STEP 6: Validate Model A (Dynamic fallback baseline):
     let modelAValid = true;
     let modelARejectionReason = null;
 
@@ -349,10 +428,10 @@ class DistanceEngine {
       }
     }
 
-    // 6. Selection Priority:
+    // STEP 7 & 8: Arbiter Selection (Compare ONLY models that passed validation):
     let selectedModel = null;
     let rationale = '';
-    let confidenceScore = 'High';
+    let confidenceScore = 'HIGH';
     let status = 'VERIFIED';
 
     if (gpsValid && osrmValid) {
@@ -360,15 +439,15 @@ class DistanceEngine {
       const diffRatio = diffKm / Math.min(modelB.distanceKm, modelC.distanceKm);
 
       if (diffRatio <= 0.35 || diffKm <= 1.5) {
-        // High agreement: GPS path confirmed by road network. Use GPS Model B as true driver path.
+        // High agreement: GPS path confirmed by road network. Use GPS Model B.
         selectedModel = {
           modelCode: 'MODEL_B',
           name: 'Model B (GPS Filtered)',
           distanceKm: modelB.distanceKm,
-          confidence: 'High (GPS + Road Verified)',
+          confidence: 'HIGH / GPS VERIFIED',
           reason: `Driver GPS trajectory (${modelB.distanceKm} km) verified against road network (${modelC.distanceKm} km). Variance ${(diffRatio * 100).toFixed(1)}%.`
         };
-        confidenceScore = 'High (GPS Verified)';
+        confidenceScore = 'HIGH / GPS VERIFIED';
         rationale = `Driver GPS trajectory (${modelB.distanceKm} km) verified by OpenStreetMap road route (${modelC.distanceKm} km). Model B selected.`;
       } else {
         // Driver followed a specific alternate route
@@ -376,33 +455,33 @@ class DistanceEngine {
           modelCode: 'MODEL_B',
           name: 'Model B (GPS Filtered)',
           distanceKm: modelB.distanceKm,
-          confidence: 'High (Driver Trajectory)',
+          confidence: 'HIGH / GPS VERIFIED',
           reason: `Driver followed valid verified path (${modelB.distanceKm} km) vs straight line (${directDistance.toFixed(1)} km).`
         };
-        confidenceScore = 'High (Driver Trajectory)';
+        confidenceScore = 'HIGH / GPS VERIFIED';
         rationale = `Continuous GPS points confirmed driver path (${modelB.distanceKm} km). Model B selected.`;
       }
     } else if (osrmValid) {
-      // GPS invalid (e.g. truncated / dropped points), OSRM valid
+      // Model B is INVALID (e.g. INSUFFICIENT EVIDENCE as in 18-minute screenshot with 9 points), Model C is valid
       selectedModel = {
         modelCode: 'MODEL_C',
         name: 'Model C (OSRM Road Network)',
         distanceKm: modelC.distanceKm,
-        confidence: 'High (Road Network Verified)',
-        reason: `GPS trace rejected: ${gpsRejectionReason}. Selected validated OpenStreetMap road distance (${modelC.distanceKm} km).`
+        confidence: 'HIGH / ROAD VERIFIED',
+        reason: `Model B rejected: ${gpsRejectionReason}. Selected validated OpenStreetMap road distance (${modelC.distanceKm} km).`
       };
-      confidenceScore = 'High (Road Verified)';
-      rationale = `GPS data rejected (${gpsRejectionReason}). Validated road route (${modelC.distanceKm} km) selected.`;
+      confidenceScore = 'HIGH / ROAD VERIFIED';
+      rationale = `Model B rejected: ${gpsRejectionReason}. Selected validated OpenStreetMap road distance (${modelC.distanceKm} km).`;
     } else if (gpsValid) {
-      // OSRM invalid (e.g. 38.6 km outlier or offline), GPS valid
+      // OSRM invalid (e.g. outlier or offline), GPS valid
       selectedModel = {
         modelCode: 'MODEL_B',
         name: 'Model B (GPS Filtered)',
         distanceKm: modelB.distanceKm,
-        confidence: 'High (GPS Verified)',
+        confidence: 'HIGH / GPS VERIFIED',
         reason: `OSRM rejected: ${osrmRejectionReason}. Selected validated driver GPS distance (${modelB.distanceKm} km).`
       };
-      confidenceScore = 'High (GPS Verified)';
+      confidenceScore = 'HIGH / GPS VERIFIED';
       rationale = `OSRM query rejected (${osrmRejectionReason}). Filtered GPS trajectory (${modelB.distanceKm} km) selected.`;
     } else if (modelAValid) {
       // Both B and C invalid, fallback to A
@@ -410,30 +489,41 @@ class DistanceEngine {
         modelCode: 'MODEL_A',
         name: modelA.method,
         distanceKm: modelA.distanceKm,
-        confidence: 'Medium (Dynamic Fallback)',
+        confidence: 'MEDIUM / FALLBACK',
         reason: `GPS rejected (${gpsRejectionReason}) and OSRM rejected (${osrmRejectionReason}). Model A baseline used.`
       };
-      confidenceScore = 'Medium (Fallback)';
+      confidenceScore = 'MEDIUM / FALLBACK';
       status = 'FALLBACK';
-      rationale = `GPS and road routing inconclusive. Selected dynamic baseline: ${modelA.note}.`;
+      rationale = `GPS and road routing failed validation. Selected dynamic baseline: ${modelA.note}.`;
     } else {
-      // All models invalid: DO NOT invent a distance. Mark NEEDS_REVIEW!
+      // STEP 9: All models invalid: DO NOT invent a distance. Mark NEEDS_REVIEW!
       selectedModel = {
         modelCode: 'NEEDS_REVIEW',
         name: 'NEEDS_REVIEW (Manual Audit Required)',
         distanceKm: 0.0,
-        confidence: 'Low (Audit Required)',
+        confidence: 'LOW / INSUFFICIENT EVIDENCE',
         reason: `All distance models failed validation. Direct displacement: ${directDistance.toFixed(1)} km. GPS: ${gpsRejectionReason}. OSRM: ${osrmRejectionReason}.`
       };
-      confidenceScore = 'Low (Needs Audit)';
+      confidenceScore = 'LOW / INSUFFICIENT EVIDENCE';
       status = 'NEEDS_REVIEW';
       rationale = `Data anomaly: GPS rejected (${gpsRejectionReason}) and OSRM rejected (${osrmRejectionReason}). Marked for supervisor audit.`;
     }
 
     const decisionLog = {
       directDistance: parseFloat(directDistance.toFixed(2)),
-      modelA: { distanceKm: modelA.distanceKm, valid: modelAValid, rejectionReason: modelARejectionReason, note: modelA.note },
-      modelB: { distanceKm: modelB.distanceKm, valid: gpsValid, rejectionReason: gpsRejectionReason, note: modelB.note },
+      durationMinutes: durMin,
+      durationSeconds: durSec,
+      modelA: { distanceKm: modelA.distanceKm, valid: modelAValid, rejectionReason: modelARejectionReason, formula: modelA.formula, note: modelA.note },
+      modelB: {
+        distanceKm: modelB.distanceKm,
+        valid: gpsValid,
+        rejectionReason: gpsRejectionReason,
+        pointCount: modelB.pointCount,
+        minimumRequiredPoints: modelB.minimumRequiredPoints,
+        expectedPoints: modelB.expectedPoints,
+        coveragePercent: modelB.coveragePercent,
+        note: modelB.note
+      },
       modelC: { distanceKm: modelC.distanceKm, valid: osrmValid, rejectionReason: osrmRejectionReason, note: modelC.note },
       selectedModel: selectedModel.modelCode,
       finalDistance: selectedModel.distanceKm,

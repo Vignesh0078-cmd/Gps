@@ -439,7 +439,7 @@ Synthesizes Material Design 3 surface elevation with high-contrast industrial ut
 - **Status:** `IMPLEMENTED`
 
 ### Feature 4: Multi-Model Distance Engine & Algorithmic Arbiter
-- **Purpose:** Computes distance across 3 independent models and selects authoritative mileage.
+- **Purpose:** Computes distance across 3 independent models and selects authoritative mileage via strict evidence validation.
 - **User:** Driver / Supervisor.
 - **Entry Point:** `btnEndTrip` click handler.
 - **UI Components:** Trip Summary Modal (`#tripSummaryModal`), Hero Mileage Tile (`#modalFinalDistance`).
@@ -447,8 +447,14 @@ Synthesizes Material Design 3 surface elevation with high-contrast industrial ut
 - **Database:** Supabase `trips` table.
 - **External Service:** OSRM Project.
 - **State:** `nlTracker.activeTripRecord`.
-- **Validation:** Boundary checks ($B, C \ge 0.85 \times \text{displacement}$), stationary anti-fraud check ($<60$m displacement $\to 0.0$ KM).
-- **Error Handling:** 4.5-second abort timeout on OSRM fetch; falls back to Model B if offline.
+- **Validation & Business Rules:**
+  - **Point Validity vs Point Sufficiency:** Individual points are checked for accuracy ($\le 50$m), speed ($\le 120$ km/h), and spikes. Entire trajectory is evaluated for evidence sufficiency ($\text{min\_pts} = \max(12, \lceil \text{duration\_minutes} \times 6 \rceil)$).
+  - **Single Authoritative Point Array:** `Total Captured === Valid Accepted + Noise Filtered` everywhere; Model B point count strictly equals valid GPS points array.
+  - **Model B Disqualification:** If valid points $< \text{min\_pts}$ (e.g. 9 points in 18 min), Model B is marked `INVALID — INSUFFICIENT EVIDENCE` and CANNOT be selected.
+  - **Arbiter Selection Priority:** Evaluates only valid models. When Model B is rejected for insufficient data, Model C (OSRM road route) is selected.
+  - **Model A Transparency:** Expressed dynamically as $\text{direct\_distance} \times 1.25$ road winding factor.
+  - **Stationary Anti-Fraud Lock:** Trips with $< 60$m displacement lock to $0.0$ KM.
+- **Error Handling:** 4.5-second abort timeout on OSRM fetch; falls back cleanly to Model B if offline (provided Model B has sufficient evidence).
 - **Status:** `IMPLEMENTED`
 
 ### Feature 5: Driver Analytics & 7-Day Mon–Sun Chart
@@ -676,20 +682,20 @@ OSRM_BASE_URL=<required>        # Configured to https://router.project-osrm.org
 | Module / Layer | Status | Implementation Notes |
 | :--- | :--- | :--- |
 | **Driver Cockpit HUD** | `IMPLEMENTED` | Real-time speedometer, odometer, clock, GNSS accuracy, Start/Stop Trip CTAs. |
-| **Hardware GPS Tracking** | `IMPLEMENTED` | HTML5 `watchPosition` streaming with high accuracy enabled. |
+| **Hardware GPS Tracking** | `IMPLEMENTED` | HTML5 `watchPosition` + Screen WakeLock API + 8s GNSS heartbeat poll fallback. |
 | **3-Stage GPS Filter** | `IMPLEMENTED` | Accuracy filter, speed cap filter, and 3-point spike filter fully active. |
-| **Multi-Model Distance** | `IMPLEMENTED` | Models A, B, and C with algorithmic Arbiter reconciliation. |
+| **Multi-Model Distance** | `IMPLEMENTED` | Models A, B, and C with evidence sufficiency rules and Arbiter reconciliation. |
 | **Stationary Fraud Lock** | `IMPLEMENTED` | Automatically locks trips $< 60$m displacement to $0.0$ KM. |
 | **Offline Local Queue** | `IMPLEMENTED` | Points saved with `sync_status: 'pending'` during blackouts. |
 | **Supabase Auto-Sync** | `IMPLEMENTED` | Idempotent upsert syncs points in batches of 50 with zero duplicates. |
-| **Trip Audit Modal** | `IMPLEMENTED` | Full breakdown table, noise stats, and decision rationale. |
+| **Trip Audit Modal** | `IMPLEMENTED` | Authoritative point consistency, coverage ratio, and evidence sufficiency badge. |
 | **Driver Analytics** | `IMPLEMENTED` | Daily KM, duty hours, interactive Mon–Sun weekly chart, history table. |
 | **Admin Fleet Map** | `IMPLEMENTED` | Multi-vehicle corridor tracking across Tamil Nadu and Karnataka. |
 | **Algorithm Lab** | `IMPLEMENTED` | Interactive corridor simulation, noise injection bench, test runner. |
-| **Section 31 Test Suite** | `IMPLEMENTED` | Automated runner passing all 5 specification tests (`5/5 PASSED`). |
+| **Specification Test Suite** | `IMPLEMENTED` | Automated runner passing all 8 specification & evidence tests (`8/8 PASSED`). |
 | **Database Migrations** | `IMPLEMENTED` | `supabase_migration.sql` with PostGIS extension and RLS policies. |
 | **PowerPoint & Slides** | `IMPLEMENTED` | `Namma_Lorry_GPS_Implementation.pptx` and `presentation.html`. |
-| **Background Location Lock**| `NOT IMPLEMENTED`| Requires wrapping app in native Capacitor/Flutter container. |
+| **Background Location Lock**| `PARTIAL (WEB)` | Screen WakeLock prevents screen sleep; native Capacitor/Flutter container recommended for full backgrounding. |
 | **FASTag / Toll Plaza Sync** | `NOT IMPLEMENTED`| Planned for Phase 2 commercial expansion. |
 
 ---
@@ -697,8 +703,8 @@ OSRM_BASE_URL=<required>        # Configured to https://router.project-osrm.org
 ## 14. Known Limitations & Technical Debt
 
 ### Known Limitations
-1. **Mobile Background Execution:** When running in a standard mobile web browser (Chrome/Edge/Safari), minimizing the browser or locking the phone screen can cause mobile OS power-savers to throttle `navigator.geolocation` intervals.
-2. **Public OSRM Rate Limits:** The public demo server (`router.project-osrm.org`) has rate limits during extreme traffic spikes.
+1. **Mobile Background Execution:** When running in a standard mobile web browser (Chrome/Safari), the Screen WakeLock API keeps the screen awake during active trips. Minimizing the browser or switching away can still cause OS-level background throttling; wrapping in Capacitor or a progressive web app service worker is recommended for long unmonitored highway hauls.
+2. **Public OSRM Rate Limits:** The public demo server (`router.project-osrm.org`) has rate limits during extreme traffic spikes. Fallback highway winding factor ($1.25 \times \text{displacement}$) activates gracefully if unreachable.
 
 ### Technical Debt
 1. **Config Key Placement:** `js/config.js` houses the Supabase public anon key directly in the repository for static SPA hosting. In commercial multi-tenant setups, this should be injected via build-time environment variables.

@@ -452,9 +452,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modalMethod').textContent = trip.calculationMethod || 'Model B (GPS Filtered)';
     document.getElementById('modalRationale').textContent = trip.rationale || `Verified via ${trip.calculationMethod || 'GNSS Satellite Tracking'}`;
 
-    // Quality Stats (Safe fallbacks for cloud-hydrated trips)
-    const pointsTotal = trip.pointsCaptured || (trip.points ? trip.points.length : 16);
-    const pointsValid = (trip.points && trip.points.length > 0) ? trip.points.length : Math.max(1, pointsTotal - (trip.pointsFiltered || 0));
+    // Quality Stats (Authoritative single array source)
+    const pointsTotal = trip.pointsCaptured !== undefined ? trip.pointsCaptured : (trip.rawPoints ? trip.rawPoints.length : (trip.points ? trip.points.length : 16));
+    const pointsValid = (trip.points && trip.points.length > 0) ? trip.points.length : (trip.breakdown?.modelB?.pointCount || Math.max(1, pointsTotal - (trip.pointsFiltered || 0)));
     const pointsRejected = trip.pointsFiltered !== undefined ? trip.pointsFiltered : Math.max(0, pointsTotal - pointsValid);
 
     document.getElementById('modalPointsTotal').textContent = pointsTotal;
@@ -473,6 +473,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const mB = breakdown.modelB || {};
     const mC = breakdown.modelC || {};
 
+    // Point Sufficiency & Coverage Stats (Part 2 & 3)
+    const durMin = trip.durationMinutes || 1;
+    const minRequired = mB.minimumRequiredPoints || Math.max(12, Math.ceil(durMin * 6));
+    const covPercent = mB.coveragePercent !== undefined
+      ? `${mB.coveragePercent}%`
+      : `${Math.min(100, Math.round((pointsValid / Math.max(1, (durMin * 60) / 5)) * 100))}%`;
+    const isSufficient = mB.valid !== false && pointsValid >= minRequired;
+
+    const elMinReq = document.getElementById('modalPointsRequired');
+    if (elMinReq) elMinReq.textContent = minRequired;
+
+    const elCov = document.getElementById('modalGpsCoverage');
+    if (elCov) elCov.textContent = covPercent;
+
+    const elEvidenceStatus = document.getElementById('modalEvidenceStatus');
+    if (elEvidenceStatus) {
+      if (isSufficient) {
+        elEvidenceStatus.textContent = 'SUFFICIENT';
+        elEvidenceStatus.className = 'badge badge-success';
+      } else {
+        elEvidenceStatus.textContent = 'INSUFFICIENT';
+        elEvidenceStatus.className = 'badge badge-error';
+      }
+    }
+
     const distA = mA.distanceKm !== undefined ? mA.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : '--');
     const distB = mB.distanceKm !== undefined ? mB.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : '--');
     const distC = mC.distanceKm !== undefined ? mC.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : '--');
@@ -487,12 +512,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const descC = document.getElementById('modelCDesc');
 
     if (descA) {
-      descA.textContent = mA.note || (mA.isCorridorMatch ? 'Matched freight corridor baseline' : 'Start-to-stop straight line × 1.25 road factor');
+      descA.textContent = mA.formula || mA.note || (mA.isCorridorMatch ? 'Matched freight corridor baseline' : 'Start-to-stop straight line × 1.25 road factor');
     }
     if (descB) {
-      descB.textContent = mB.rejectionReason
-        ? `REJECTED: ${mB.rejectionReason}`
-        : (mB.note || `${pointsValid} filtered geodesic GPS points`);
+      if (mB.valid === false) {
+        descB.innerHTML = `<span style="color:#ef4444; font-weight:700;">❌ INSUFFICIENT EVIDENCE</span><br><span style="font-size:0.75rem;">Req: ${minRequired} | Avail: ${pointsValid} (${covPercent})</span>`;
+      } else {
+        descB.textContent = mB.note || `${pointsValid} validated GPS points (coverage: ${covPercent})`;
+      }
     }
     if (descC) {
       descC.textContent = mC.rejectionReason
@@ -522,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
       modelBBox.className = 'model-box chosen';
     } else if (mB.valid === false) {
       modelBBox.className = 'model-box rejected';
-      modelBBox.setAttribute('data-reject-badge', 'REJECTED');
+      modelBBox.setAttribute('data-reject-badge', 'INSUFFICIENT EVIDENCE');
     } else if (mB.valid === true) {
       modelBBox.className = 'model-box valid-alt';
     } else {
@@ -980,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnRunAllTests.innerHTML = '<span>⏳ Executing Test Suite...</span>';
     await testRunner.runAllTests();
     btnRunAllTests.disabled = false;
-    btnRunAllTests.innerHTML = '<span>⚡ Run All Section 31 Tests</span>';
+    btnRunAllTests.innerHTML = '<span>⚡ Run All 8 Specification Tests</span>';
     updateNetworkUI(store.isOnline());
   });
 
@@ -998,6 +1025,9 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (testNum === '3') await testRunner.runTest3();
       else if (testNum === '4') await testRunner.runTest4();
       else if (testNum === '5') await testRunner.runTest5();
+      else if (testNum === '6') await testRunner.runTest6();
+      else if (testNum === '7') await testRunner.runTest7();
+      else if (testNum === '8') await testRunner.runTest8();
       btn.disabled = false;
       updateNetworkUI(store.isOnline());
     });
