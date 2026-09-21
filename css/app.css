@@ -872,6 +872,39 @@
   border-radius: var(--radius-pill);
 }
 
+.model-box.rejected {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.05);
+  opacity: 0.85;
+}
+
+.model-box.rejected::after {
+  content: attr(data-reject-badge);
+  position: absolute;
+  top: -9px;
+  right: 12px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+}
+
+.model-box.valid-alt::after {
+  content: 'VALID';
+  position: absolute;
+  top: -9px;
+  right: 12px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+}
+
 .model-name {
   font-size: 0.72rem;
   font-weight: 700;

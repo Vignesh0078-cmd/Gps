@@ -337,8 +337,9 @@ class GPSTracker {
       destination,
       startedAt: this.tripStartTime.toISOString(),
       endedAt: tripEndTime.toISOString(),
-      status: 'completed',
+      status: calculation.status === 'NEEDS_REVIEW' ? 'needs_review' : 'completed',
       distanceKm: calculation.finalDistanceKm,
+      directDistance: calculation.directDistance,
       calculationMethod: calculation.selectedModel.name,
       durationMinutes,
       pointsCaptured: this.rawPoints.length,
@@ -347,6 +348,7 @@ class GPSTracker {
       auditConfidence: calculation.confidenceScore,
       breakdown: calculation.breakdown,
       rationale: calculation.rationale,
+      decisionLog: calculation.decisionLog,
       points: this.cleanedPoints,
       rejectedPoints: this.rejectedPoints
     };

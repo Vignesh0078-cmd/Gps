@@ -797,27 +797,30 @@
         <div class="model-comparison-grid">
           <div class="model-box" id="modalModelABox">
             <span class="model-name">Model A (Fallback)</span>
-            <span class="model-km" id="modelAKm">42.0 KM</span>
-            <span class="model-desc">Known highway corridor baseline</span>
+            <span class="model-km" id="modelAKm">-- KM</span>
+            <span class="model-desc" id="modelADesc">Dynamic Highway Baseline</span>
           </div>
 
           <div class="model-box" id="modalModelBBox">
             <span class="model-name">Model B (GPS Haversine)</span>
-            <span class="model-km" id="modelBKm">41.8 KM</span>
-            <span class="model-desc">Filtered points geodesic sum (offline)</span>
+            <span class="model-km" id="modelBKm">-- KM</span>
+            <span class="model-desc" id="modelBDesc">Filtered points geodesic sum</span>
           </div>
 
           <div class="model-box chosen" id="modalModelCBox">
             <span class="model-name">Model C (OSRM Road)</span>
-            <span class="model-km" id="modelCKm">42.4 KM</span>
-            <span class="model-desc">OpenStreetMap road network matched</span>
+            <span class="model-km" id="modelCKm">-- KM</span>
+            <span class="model-desc" id="modelCDesc">OpenStreetMap road network</span>
           </div>
         </div>
 
         <!-- Rationale & Quality Audit Details -->
         <div style="background: var(--nl-surface-dim); border: 1px solid var(--nl-surface-card-border); border-radius: var(--radius-md); padding: 14px; font-size: 0.8rem; color: var(--nl-text-secondary); margin-bottom: 20px;">
-          <strong style="color: #ffffff;">Decision Rationale:</strong>
-          <span id="modalRationale">Road-snapped OpenStreetMap distance matches recorded GPS within 15%. Model C selected.</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: #ffffff;">Decision Rationale:</strong>
+            <span id="modalDisplacementBadge" class="badge" style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Straight line: -- km</span>
+          </div>
+          <span id="modalRationale">Evaluating trip data...</span>
         </div>
 
         <!-- Quality Metrics Grid -->

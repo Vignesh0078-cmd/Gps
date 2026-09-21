@@ -466,19 +466,91 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelABox = document.getElementById('modalModelABox');
     const modelBBox = document.getElementById('modalModelBBox');
     const modelCBox = document.getElementById('modalModelCBox');
+    const displacementBadge = document.getElementById('modalDisplacementBadge');
 
     const method = trip.calculationMethod || '';
-    modelABox.className = 'model-box' + (method.includes('Model A') ? ' chosen' : '');
-    modelBBox.className = 'model-box' + (method.includes('Model B') ? ' chosen' : '');
-    modelCBox.className = 'model-box' + (method.includes('Model C') ? ' chosen' : '');
+    const mA = breakdown.modelA || {};
+    const mB = breakdown.modelB || {};
+    const mC = breakdown.modelC || {};
 
-    const distA = breakdown.modelA?.distanceKm !== undefined ? breakdown.modelA.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : 42.0);
-    const distB = breakdown.modelB?.distanceKm !== undefined ? breakdown.modelB.distanceKm : trip.distanceKm;
-    const distC = breakdown.modelC?.distanceKm !== undefined ? breakdown.modelC.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : 42.4);
+    const distA = mA.distanceKm !== undefined ? mA.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : '--');
+    const distB = mB.distanceKm !== undefined ? mB.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : '--');
+    const distC = mC.distanceKm !== undefined ? mC.distanceKm : (trip.distanceKm > 0 ? trip.distanceKm : '--');
 
     document.getElementById('modelAKm').textContent = `${distA} KM`;
     document.getElementById('modelBKm').textContent = `${distB} KM`;
     document.getElementById('modelCKm').textContent = `${distC} KM`;
+
+    // Dynamic Model Subtitles
+    const descA = document.getElementById('modelADesc');
+    const descB = document.getElementById('modelBDesc');
+    const descC = document.getElementById('modelCDesc');
+
+    if (descA) {
+      descA.textContent = mA.note || (mA.isCorridorMatch ? 'Matched freight corridor baseline' : 'Start-to-stop straight line × 1.25 road factor');
+    }
+    if (descB) {
+      descB.textContent = mB.rejectionReason
+        ? `REJECTED: ${mB.rejectionReason}`
+        : (mB.note || `${pointsValid} filtered geodesic GPS points`);
+    }
+    if (descC) {
+      descC.textContent = mC.rejectionReason
+        ? `REJECTED: ${mC.rejectionReason}`
+        : (mC.note || 'OpenStreetMap road network matched');
+    }
+
+    // Class & Status Badges
+    const isModelAChoose = method.includes('Model A');
+    const isModelBChoose = method.includes('Model B');
+    const isModelCChoose = method.includes('Model C');
+
+    // Model A status
+    if (isModelAChoose) {
+      modelABox.className = 'model-box chosen';
+    } else if (mA.valid === false) {
+      modelABox.className = 'model-box rejected';
+      modelABox.setAttribute('data-reject-badge', 'INVALID');
+    } else if (mA.valid === true) {
+      modelABox.className = 'model-box valid-alt';
+    } else {
+      modelABox.className = 'model-box';
+    }
+
+    // Model B status
+    if (isModelBChoose) {
+      modelBBox.className = 'model-box chosen';
+    } else if (mB.valid === false) {
+      modelBBox.className = 'model-box rejected';
+      modelBBox.setAttribute('data-reject-badge', 'REJECTED');
+    } else if (mB.valid === true) {
+      modelBBox.className = 'model-box valid-alt';
+    } else {
+      modelBBox.className = 'model-box';
+    }
+
+    // Model C status
+    if (isModelCChoose) {
+      modelCBox.className = 'model-box chosen';
+    } else if (mC.valid === false) {
+      modelCBox.className = 'model-box rejected';
+      modelCBox.setAttribute('data-reject-badge', 'REJECTED');
+    } else if (mC.valid === true) {
+      modelCBox.className = 'model-box valid-alt';
+    } else {
+      modelCBox.className = 'model-box';
+    }
+
+    // Straight-line displacement badge
+    if (displacementBadge) {
+      const dispKm = trip.directDistance !== undefined ? trip.directDistance : (trip.decisionLog?.directDistance || null);
+      if (dispKm !== null && dispKm !== undefined) {
+        displacementBadge.textContent = `Straight line: ${dispKm} km`;
+        displacementBadge.style.display = 'inline-block';
+      } else {
+        displacementBadge.style.display = 'none';
+      }
+    }
 
     tripSummaryModal.classList.add('open');
   }
