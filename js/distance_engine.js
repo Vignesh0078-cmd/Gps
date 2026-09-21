@@ -438,28 +438,58 @@ class DistanceEngine {
       const diffKm = Math.abs(modelC.distanceKm - modelB.distanceKm);
       const diffRatio = diffKm / Math.min(modelB.distanceKm, modelC.distanceKm);
 
-      if (diffRatio <= 0.35 || diffKm <= 1.5) {
-        // High agreement: GPS path confirmed by road network. Use GPS Model B.
+      if (diffRatio <= 0.20 || diffKm <= 1.5) {
+        // High agreement (<= 20% divergence or <= 1.5 km): GPS trajectory is verified by road network
         selectedModel = {
           modelCode: 'MODEL_B',
           name: 'Model B (GPS Filtered)',
           distanceKm: modelB.distanceKm,
           confidence: 'HIGH / GPS VERIFIED',
-          reason: `Driver GPS trajectory (${modelB.distanceKm} km) verified against road network (${modelC.distanceKm} km). Variance ${(diffRatio * 100).toFixed(1)}%.`
+          reason: `Driver GPS trajectory (${modelB.distanceKm} km) closely matches road network (${modelC.distanceKm} km). Variance ${(diffRatio * 100).toFixed(1)}%.`
         };
         confidenceScore = 'HIGH / GPS VERIFIED';
-        rationale = `Driver GPS trajectory (${modelB.distanceKm} km) verified by OpenStreetMap road route (${modelC.distanceKm} km). Model B selected.`;
+        rationale = `High agreement: Driver GPS trajectory (${modelB.distanceKm} km) confirmed by OpenStreetMap road route (${modelC.distanceKm} km). Model B selected.`;
       } else {
-        // Driver followed a specific alternate route
-        selectedModel = {
-          modelCode: 'MODEL_B',
-          name: 'Model B (GPS Filtered)',
-          distanceKm: modelB.distanceKm,
-          confidence: 'HIGH / GPS VERIFIED',
-          reason: `Driver followed valid verified path (${modelB.distanceKm} km) vs straight line (${directDistance.toFixed(1)} km).`
-        };
-        confidenceScore = 'HIGH / GPS VERIFIED';
-        rationale = `Continuous GPS points confirmed driver path (${modelB.distanceKm} km). Model B selected.`;
+        // Models diverge (> 20% and > 1.5 km): Evaluate the situation and data density — DO NOT hardcode Model B!
+        const hasHighDensity = (modelB.coveragePercent >= 75) && (modelB.maxGapSeconds <= 90);
+        const isCornerCutting = modelB.distanceKm < (modelC.distanceKm * 0.85);
+
+        if (isCornerCutting && !hasHighDensity) {
+          // Model B is significantly shorter than the road network without dense points.
+          // Cause: Sparse GPS points cut corners across highway curves/intersections.
+          // Action: Select Model C because corner-cutting undercounts actual road travel!
+          selectedModel = {
+            modelCode: 'MODEL_C',
+            name: 'Model C (OSRM Road Network)',
+            distanceKm: modelC.distanceKm,
+            confidence: 'HIGH / ROAD VERIFIED',
+            reason: `GPS distance (${modelB.distanceKm} km) is shorter than road route (${modelC.distanceKm} km) with moderate coverage (${modelB.coveragePercent}%). Corner-cutting detected; road network selected.`
+          };
+          confidenceScore = 'HIGH / ROAD VERIFIED';
+          rationale = `Divergence detected: GPS trace (${modelB.distanceKm} km) cuts corners vs road network (${modelC.distanceKm} km). Model C selected for accurate road mileage.`;
+        } else if (hasHighDensity) {
+          // Continuous, high-density GPS confirms driver took an actual physical detour/alternate route
+          selectedModel = {
+            modelCode: 'MODEL_B',
+            name: 'Model B (GPS Filtered)',
+            distanceKm: modelB.distanceKm,
+            confidence: 'HIGH / DRIVER DETOUR',
+            reason: `Dense GPS coverage (${modelB.pointCount} pts, ${modelB.coveragePercent}%) confirms driver took a physical alternate route (${modelB.distanceKm} km) differing from standard route (${modelC.distanceKm} km).`
+          };
+          confidenceScore = 'HIGH / DRIVER DETOUR';
+          rationale = `Driver detour verified: High-density GPS trace confirms physical route (${modelB.distanceKm} km) vs standard corridor (${modelC.distanceKm} km). Model B selected.`;
+        } else {
+          // Moderate density with divergence: standard road network is safer and more defensible
+          selectedModel = {
+            modelCode: 'MODEL_C',
+            name: 'Model C (OSRM Road Network)',
+            distanceKm: modelC.distanceKm,
+            confidence: 'MEDIUM / ROAD PRIORITIZED',
+            reason: `Divergence of ${(diffRatio * 100).toFixed(1)}% between GPS (${modelB.distanceKm} km) and road route (${modelC.distanceKm} km) with ${modelB.coveragePercent}% GPS coverage. Road network selected as authoritative.`
+          };
+          confidenceScore = 'MEDIUM / ROAD PRIORITIZED';
+          rationale = `Divergent route with partial GPS coverage (${modelB.coveragePercent}%). Standard road network (${modelC.distanceKm} km) selected as defensible mileage.`;
+        }
       }
     } else if (osrmValid) {
       // Model B is INVALID (e.g. INSUFFICIENT EVIDENCE as in 18-minute screenshot with 9 points), Model C is valid
